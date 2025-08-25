@@ -1,0 +1,211 @@
+{
+  "dataRoles": [
+    {
+      "name": "sequence",
+      "kind": "Grouping",
+      "displayName": "Sequence Order"
+    },
+    {
+      "name": "imageUrl",
+      "kind": "Measure",
+      "displayName": "Image URL or SVG Text"
+    },
+    {
+      "name": "label",
+      "kind": "Measure",
+      "displayName": "Frame Label (Optional)"
+    }
+  ],
+  "dataViewMappings": [
+  {
+    "categorical": {
+      "categories": {
+        "for": {
+          "in": "sequence"
+        },
+        "dataReductionAlgorithm": {
+          "top": {
+            "count": 3500
+          }
+        }
+      },
+      "values": {
+        "select": [
+          {
+            "bind": {
+              "to": "imageUrl"
+            }
+          },
+          {
+            "bind": {
+              "to": "label"
+            }
+          }
+        ],
+        "dataReductionAlgorithm": {
+          "top": {
+            "count": 3500
+          }
+        }
+      }
+    }
+  }
+],
+  "sorting": {
+    "default": {}
+  },
+  "objects": {
+    "playback": {
+      "displayName": "Playback Settings",
+      "properties": {
+        "selectionSequence": {
+          "displayName": "Selection Sequence",
+          "description": "Enable to apply a filter for each frame during playback.",
+          "type": {
+            "bool": true
+          }
+        },
+        "defaultFrameDuration": {
+          "displayName": "Default Frame Duration (ms)",
+          "description": "The time each frame is displayed during playback.",
+          "type": {
+            "numeric": true
+          }
+        }
+      }
+    },
+    "transition": {
+      "displayName": "Transition Settings",
+      "properties": {
+        "transitionType": {
+          "displayName": "Transition Type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "none",
+                "displayName": "None"
+              },
+              {
+                "value": "fade",
+                "displayName": "Fade"
+              },
+              {
+                "value": "slideHorizontal",
+                "displayName": "Slide Horizontally"
+              },
+              {
+                "value": "slideVertical",
+                "displayName": "Slide Vertically"
+              }
+            ]
+          }
+        },
+        "transitionDuration": {
+          "displayName": "Transition Duration (ms)",
+          "type": {
+            "numeric": true
+          }
+        }
+      }
+    },
+    "labels": {
+      "displayName": "Label Settings",
+      "properties": {
+        "show": {
+          "displayName": "Show Labels",
+          "type": {
+            "bool": true
+          }
+        },
+        "labelColor": {
+          "displayName": "Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "fontFamily": {
+          "displayName": "Font",
+          "type": {
+            "formatting": {
+              "fontFamily": true
+            }
+          }
+        },
+        "fontSize": {
+          "displayName": "Font Size",
+          "type": {
+            "formatting": {
+              "fontSize": true
+            }
+          }
+        },
+        "bold": {
+          "displayName": "Bold",
+          "type": {
+            "bool": true
+          }
+        },
+        "italic": {
+          "displayName": "Italic",
+          "type": {
+            "bool": true
+          }
+        },
+        "position": {
+          "displayName": "Position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "above",
+                "displayName": "Above"
+              },
+              {
+                "value": "below",
+                "displayName": "Below"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "general": {
+      "displayName": "General Settings",
+      "properties": {
+        "imageAlignment": {
+          "displayName": "Image Alignment",
+          "type": {
+            "enumeration": [
+              {
+                "value": "contain",
+                "displayName": "Fit"
+              },
+              {
+                "value": "cover",
+                "displayName": "Fill"
+              },
+              {
+                "value": "scale-down",
+                "displayName": "Center"
+              }
+            ]
+          }
+        },
+        "backgroundColor": {
+          "displayName": "Background Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "privileges": []
+}

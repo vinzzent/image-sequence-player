@@ -15,216 +15,201 @@
     flex-direction: column;
     overflow: hidden;
     font-family: 'Segoe UI', 'wf_segoe-ui_normal', 'Arial', sans-serif;
-}
 
-// Main content area (Image + Label)
-.content-container {
-    flex-grow: 1;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    // The min-height prevents the image from disappearing completely
-    // if the visual's height is smaller than the expanded controls.
-    min-height: 50px; 
-}
-
-// Image container for transitions
-.image-container {
-    flex-grow: 1;
-    position: relative;
-    overflow: hidden;
-    cursor: pointer;
-
-    img {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        transition-property: opacity, transform;
-        backface-visibility: hidden; /* Helps prevent flickering */
-    
-        // Default state for the 'next' image element
-        &.standby {
-            opacity: 0;
-            transform: translate(0, 0); // Ensure it's in the center but invisible
-        }
-    }
-}
-
-// Label styling
-.label-container {
-    text-align: center;
-    padding: 5px;
-    box-sizing: border-box;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-// Controls panel
-.controls-wrapper {
-    position: relative;
-    width: 100%;
-    flex-shrink: 0; // Prevent the container from shrinking
-    height: @collapsed-controls-height;
-    transition: height 0.3s ease-in-out;
-
-    .panel-indicator {
-        position: absolute;
-        left: 50%;
-        bottom: 0; // Positioned at the bottom of the wrapper
-        transform: translateX(-50%); // Horizontally center the button
-        background-color: rgba(245, 245, 245, 0.9);
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        width: @indicator-size + 10px;
-        height: @indicator-size;
-        border-radius: 5px;
-        z-index: 10;
-        transition: bottom 0.3s ease-in-out;
-        
-        // Flex properties to perfectly center the SVG inside the button
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-
-        svg {
-            width: @indicator-size;
-            height: @indicator-size;
-            fill: #555;
-            transition: transform 0.3s ease-in-out;
-        }
-
-        &:hover {
-            background-color: rgba(220, 220, 220, 0.95);
-        }
-    }
-
-    .controls-panel {
-        width: 100%;
-        height: 100%;
-        background-color: rgba(245, 245, 245, 0.9);
-        overflow: hidden;
+    // Main content area (Image + Label)
+    .content-container {
+        flex-grow: 1;
+        position: relative;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        opacity: 0; // Make controls invisible by default when collapsed
-        transition: opacity 0.2s ease;
+        overflow: hidden;
+        min-height: 50px;
     }
 
-    &.is-expanded {
-        height: @controls-height + @progress-height;
+    // Image container for transitions
+    .image-container {
+        flex-grow: 1;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+
+        img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* Helps prevent flickering */
+
+            // Base states to handle both resting (.active/.standby)
+            // and transitioning (.current/.next) classes.
+            &.active, &.current {
+                opacity: 1;
+                z-index: 1;
+            }
+
+            &.standby, &.next {
+                opacity: 0;
+                z-index: 2; // Next image is on top to slide over the current one.
+            }            
+        }
+    }
+
+    // Label styling
+    .label-container {
+        text-align: center;
+        padding: 5px;
+        box-sizing: border-box;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    // Controls panel
+    .controls-wrapper {
+        position: relative;
+        width: 100%;
+        flex-shrink: 0;
+        height: @collapsed-controls-height;
+        transition: height 0.3s ease-in-out;
         
-        .controls-panel {
-            opacity: 1; // Fade in controls when expanded
-            transition-delay: 0.1s; // Delay fade-in to sync with resizing
+        .panel-indicator {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            background-color: rgba(245, 245, 245, 0.9);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            width: @indicator-size + 10px;
+            height: @indicator-size;
+            border-radius: 5px;
+            z-index: 10;
+            transition: bottom 0.3s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+
+            svg {
+                width: @indicator-size;
+                height: @indicator-size;
+                fill: #555;
+                transition: transform 0.3s ease-in-out;
+            }
+
+            &:hover {
+                background-color: rgba(220, 220, 220, 0.95);
+            }
         }
 
-        .panel-indicator {
-            bottom: 100%; // Position above the expanded panel
-            margin-bottom: 2px; // Small gap
+        .controls-panel {
+            width: 100%;
+            height: 100%;
+            background-color: rgba(245, 245, 245, 0.9);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        &.is-expanded {
+            height: @controls-height + @progress-height;
             
+            .controls-panel {
+                opacity: 1;
+                transition-delay: 0.1s;
+            }
+
+            .panel-indicator {
+                bottom: 100%;
+                margin-bottom: 2px;
+                
+                svg {
+                    transform: rotate(180deg);
+                }
+            }
+        }
+    }
+
+    // Progress dots
+    .progress-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: @progress-height;
+        gap: 8px;
+        padding: 0 10px;
+        
+        .dot {
+            width: @dot-size;
+            height: @dot-size;
+            background-color: #aaa;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background-color: #333;
+            }
+
+            &.active {
+                background-color: #118DFF; // Power BI selection blue
+                width: @active-dot-size;
+                height: @active-dot-size;
+            }
+        }
+    }
+
+    // Control buttons
+    .control-buttons {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: @controls-height;
+        gap: 15px;
+
+        button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            
+            &:hover {
+                background-color: rgba(0, 0, 0, 0.1);
+            }
+
             svg {
-                transform: rotate(180deg);
+                width: @icon-size;
+                height: @icon-size;
+                fill: #333;
+            }
+
+            &.loop-toggle.active {
+                 background-color: rgba(0, 0, 0, 0.2);
             }
         }
     }
 }
 
+/* --- KEYFRAME ANIMATION ENGINE --- */
+// FADE
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
 
-// Progress dots
-.progress-indicator {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: @progress-height;
-    gap: 8px;
-    padding: 0 10px;
+// SLIDE HORIZONTAL
+@keyframes slideInFromRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOutToLeft   { from { transform: translateX(0); opacity: 1; }     to { transform: translateX(-100%); opacity: 0; } }
+@keyframes slideInFromLeft  { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOutToRight  { from { transform: translateX(0); opacity: 1; }     to { transform: translateX(100%); opacity: 0; } }
 
-    .dot {
-        width: @dot-size;
-        height: @dot-size;
-        background-color: #aaa;
-        border-radius: 50%;
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover {
-            background-color: #333;
-        }
-
-        &.active {
-            background-color: #118DFF; // Power BI selection blue
-            width: @active-dot-size;
-            height: @active-dot-size;
-        }
-    }
-}
-
-// Control buttons
-.control-buttons {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: @controls-height;
-    gap: 15px;
-
-    button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 5px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 4px;
-
-        &:hover {
-            background-color: rgba(0, 0, 0, 0.1);
-        }
-
-        svg {
-            width: @icon-size;
-            height: @icon-size;
-            fill: #333;
-        }
-
-        &.loop-toggle.active {
-             background-color: rgba(0, 0, 0, 0.2);
-        }
-    }
-}
-
-
-/* --- TRANSITION CLASSES --- */
-// Note: We use two image elements. 'current' gets exit class, 'next' gets enter class.
-
-// --- FADE ---
-.exit-fade { opacity: 0; }
-.enter-fade { opacity: 1; }
-
-// --- SLIDE HORIZONTAL ---
-.exit-slideHorizontal-fwd { transform: translateX(-100%); opacity: 0; }
-.enter-slideHorizontal-fwd { transform: translateX(0); opacity: 1; }
-.exit-slideHorizontal-rev { transform: translateX(100%); opacity: 0; }
-.enter-slideHorizontal-rev { transform: translateX(0); opacity: 1; }
-
-// Initial state for standby slide elements
-.standby {
-    &.enter-slideHorizontal-fwd { transform: translateX(100%); }
-    &.enter-slideHorizontal-rev { transform: translateX(-100%); }
-}
-
-// --- SLIDE VERTICAL ---
-.exit-slideVertical-fwd { transform: translateY(-100%); opacity: 0; }
-.enter-slideVertical-fwd { transform: translateY(0); opacity: 1; }
-.exit-slideVertical-rev { transform: translateY(100%); opacity: 0; }
-.enter-slideVertical-rev { transform: translateY(0); opacity: 1; }
-
-// Initial state for standby slide elements
-.standby {
-    &.enter-slideVertical-fwd { transform: translateY(100%); }
-    &.enter-slideVertical-rev { transform: translateY(-100%); }
-}
+// SLIDE VERTICAL
+@keyframes slideInFromBottom { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideOutToTop     { from { transform: translateY(0); opacity: 1; }     to { transform: translateY(-100%); opacity: 0; } }
+@keyframes slideInFromTop    { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideOutToBottom  { from { transform: translateY(0); opacity: 1; }     to { transform: translateY(100%); opacity: 0; } }

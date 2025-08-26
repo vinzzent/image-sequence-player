@@ -54,6 +54,10 @@ export class Visual implements IVisual {
     private playbackTimer: number;
     private isTransitioning: boolean = false;
 
+    // --- Lightweight image cache for smooth next-frame transitions ---
+    private imageCache: Map<string, HTMLImageElement> = new Map();
+    private readonly maxCacheEntries: number = 8;
+
     private static ICONS: { [key: string]: IconData } = {
         play: { viewBox: "0 0 24 24", path: "M8 5v14l11-7z" },
         pause: { viewBox: "0 0 24 24", path: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" },
@@ -76,7 +80,6 @@ export class Visual implements IVisual {
         this.labelContainer = this.contentContainer.append("div").classed("label-container", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
         
-        // Initialize both image elements
         this.currentImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 1").classed("active", true);
         this.nextImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 2").classed("standby", true);
 
@@ -90,16 +93,86 @@ export class Visual implements IVisual {
         
         const { frames, settings } = this.viewModel;
         
-        const oldIndex = this.currentIndex;
         this.currentIndex = Math.max(0, Math.min(this.currentIndex, frames.length - 1));
         
         this.render(this.currentIndex, -1);
         this.updateStyling(settings);
+
+        // Warm up the very next frame (lazy preload)
+        this.preloadNextImage(this.currentIndex);
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         return this.formattingSettingsService.buildFormattingModel(this.visualSettings);
     }
+
+    /**
+     * Return a decoded HTMLImageElement for a given src, using a small LRU cache.
+     * Ensures the image is decoded before we transition, minimizing flicker.
+     */
+    private async loadAndDecode(src: string): Promise<HTMLImageElement> {
+        if (!src) return null as any;
+
+        // If we already cached it, refresh LRU order and ensure decode
+        const cached = this.imageCache.get(src);
+        if (cached) {
+            // Refresh LRU order
+            this.imageCache.delete(src);
+            this.imageCache.set(src, cached);
+
+            if (typeof (cached as any).decode === "function") {
+                try { await cached.decode(); } catch { /* ignore */ }
+            } else if (!cached.complete) {
+                await new Promise<void>(resolve => {
+                    cached.onload = () => resolve();
+                    cached.onerror = () => resolve();
+                });
+            }
+            return cached;
+        }
+
+        // Not cached: create, set src, and wait
+        const img = new Image();
+        const wait = new Promise<void>(resolve => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve(); // fail-safe: still resolve
+        });
+        img.src = src;
+
+        // Wait for load/decode
+        await wait;
+        if (typeof (img as any).decode === "function") {
+            try { await img.decode(); } catch { /* ignore */ }
+        }
+
+        // Insert into cache and evict if needed
+        this.imageCache.set(src, img);
+        this.evictOldestIfNeeded();
+
+        return img;
+    }
+
+    /** Keep cache small to avoid memory pressure. */
+    private evictOldestIfNeeded() {
+        while (this.imageCache.size > this.maxCacheEntries) {
+            const oldestKey = this.imageCache.keys().next().value;
+            this.imageCache.delete(oldestKey);
+        }
+    }
+
+    /** Preload only the next frame (lazy strategy). */
+    private async preloadNextImage(fromIndex: number) {
+    const frames = this.viewModel?.frames;
+    if (!frames || frames.length < 2) return;
+
+    const nextIndex = (fromIndex + 1) % frames.length;
+    const nextSrc = frames[nextIndex]?.imageUrl;
+    if (!nextSrc) return;
+
+    try {
+        await this.loadAndDecode(nextSrc);
+    } catch { /* ignore errors */ }
+}
 
     private static createPlaceholderSvg(message: string): string {
         const textStyle = `font-family: 'Segoe UI', sans-serif; font-size: 14px; fill: #666666;`;
@@ -138,13 +211,42 @@ export class Visual implements IVisual {
 
             const frame: ImageFrame = {
                 identity,
-                imageUrl: imageData.values[i] as string,
+                imageUrl: this.sanitizeDataUri(imageData.values[i] as string),
                 label: labelData ? labelData.values[i] as string : ''
             };
             frames.push(frame);
         }
         
         return { frames, settings };
+    }
+
+    /**
+     * Sanitizes a data URI by ensuring only the content is URI-encoded.
+     * Mimics Power BI's native handling of SVG data URIs.
+     * e.g., "data:image/svg+xml;utf8,<svg>..." -> "data:image/svg+xml,%3Csvg%3E..."
+     * @param uri The raw data URI string.
+     */
+    private sanitizeDataUri(uri: string): string {
+        if (!uri || !uri.startsWith("data:")) {
+            return uri; // Not a data URI, return as-is (e.g., a regular https URL)
+        }
+
+        const commaIndex = uri.indexOf(',');
+        if (commaIndex === -1) {
+            return uri; // Malformed data URI
+        }
+
+        // Split into prefix ("data:image/svg+xml;utf8") and content ("<svg>...")
+        const prefix = uri.substring(0, commaIndex);
+        const content = uri.substring(commaIndex + 1);
+
+        // Remove encoding specifiers like ";utf8" or ";base64" from the prefix
+        const cleanedPrefix = prefix.split(';')[0];
+
+        // Only encode the content part
+        const encodedContent = encodeURIComponent(content);
+
+        return `${cleanedPrefix},${encodedContent}`;
     }
 
     private createPlaceholderViewModel(settings: VisualFormattingSettingsModel): ImageSequenceViewModel {
@@ -173,7 +275,7 @@ export class Visual implements IVisual {
     private setupControls() {
         this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
         
-        const indicatorButton = this.createIconButton(this.controlsWrapper, Visual.ICONS.upArrow)
+        this.createIconButton(this.controlsWrapper, Visual.ICONS.upArrow)
             .classed("panel-indicator", true)
             .on("click", () => {
                 const isExpanded = this.controlsWrapper.classed("is-expanded");
@@ -212,7 +314,10 @@ export class Visual implements IVisual {
         if (oldIndex === -1) {
             this.currentImageElement.attr("src", newFrame.imageUrl);
         } else if (newIndex !== oldIndex) {
-            this.applyTransition(newFrame.imageUrl, transitionType, transitionDuration, isSteppingForward);
+            // Make sure the next image is decoded before we animate
+            this.loadAndDecode(newFrame.imageUrl).then(() => {
+                this.applyTransition(newFrame.imageUrl, transitionType, transitionDuration, isSteppingForward);
+            });
         }
     
         const newLabel = this.visualSettings.labelCard.show.value ? newFrame.label : "";
@@ -220,40 +325,80 @@ export class Visual implements IVisual {
     
         const dots = this.progressIndicator.selectAll(".dot").data(frames);
         dots.enter().append("div").classed("dot", true)
-            .on("click", (event, d) => this.selectFrameById(d.identity));
+            .on("click", (event, d) => {
+        if (this.isTransitioning) return;  // prevent multiple clicks
+        this.selectFrameById(d.identity);
+    });
         dots.classed("active", (d, i) => i === newIndex);
         dots.exit().remove();
         
         this.imageContainer.on("click", () => this.selectFrameById(newFrame.identity));
+
+        // After rendering this frame, warm up the next one
+        this.preloadNextImage(newIndex);
     }
 
     private applyTransition(newImageUrl: string, type: string, duration: number, forward: boolean) {
         if (this.isTransitioning) return;
         this.isTransitioning = true;
-    
-        this.nextImageElement.attr("src", newImageUrl);
-        this.currentImageElement.style("transition-duration", `${duration}ms`);
-        this.nextImageElement.style("transition-duration", `${duration}ms`);
-    
-        const exitClass = `exit-${type}${type.startsWith('slide') ? (forward ? '-fwd' : '-rev') : ''}`;
-        const enterClass = `enter-${type}${type.startsWith('slide') ? (forward ? '-fwd' : '-rev') : ''}`;
-    
-        if (type !== 'none') {
-            this.currentImageElement.classed(exitClass, true);
-            this.nextImageElement.classed(enterClass, true);
+
+        const nextNode = this.nextImageElement.node();
+        if (!nextNode) {
+            this.isTransitioning = false;
+            return;
         }
-    
-        setTimeout(() => {
-            this.currentImageElement
-                .classed(exitClass, false)
-                .attr("src", newImageUrl);
-    
-            this.nextImageElement.classed(enterClass, false);
+
+        // 1. Determine animation names based on type and direction
+        let currentAnimation: string, nextAnimation: string;
+        const direction = forward ? 'fwd' : 'rev';
+
+        switch (type) {
+            case 'slideHorizontal':
+                currentAnimation = direction === 'fwd' ? 'slideOutToRight' : 'slideOutToLeft';
+                nextAnimation = direction === 'fwd' ? 'slideInFromLeft' : 'slideInFromRight';
+                break;
+            case 'slideVertical':
+                currentAnimation = direction === 'fwd' ? 'slideOutToBottom' : 'slideOutToTop';
+                nextAnimation = direction === 'fwd' ? 'slideInFromTop' : 'slideInFromBottom';
+                break;
+            case 'fade':
+            default:
+                currentAnimation = 'fadeOut';
+                nextAnimation = 'fadeIn';
+                break;
+        }
+
+        // 2. Define the cleanup logic to run after animation completes
+        const cleanup = () => {
+            // Remove event listener to prevent leaks
+            nextNode.removeEventListener('animationend', cleanup);
+            clearTimeout(safetyTimeout);
+
+            // Reset styles and classes to their resting state
+            this.currentImageElement.style("animation", null).attr("src", newImageUrl).attr("class", "active");
+            this.nextImageElement.style("animation", null).attr("class", "standby");
 
             this.isTransitioning = false;
-        }, type === 'none' ? 0 : duration);
+        };
+
+        // 3. Set up the elements for the transition
+        this.currentImageElement.attr("class", "current");
+        this.nextImageElement.attr("class", "next").attr("src", newImageUrl);
+
+        // 4. Attach a one-time event listener for cleanup
+        nextNode.addEventListener('animationend', cleanup, { once: true });
+
+        // 5. Apply the animations dynamically
+        const durationMs = `${duration}ms`;
+        const fillMode = 'forwards'; // Ensures the element holds its final animated state
+
+        this.currentImageElement.style("animation", `${currentAnimation} ${durationMs} ${fillMode}`);
+        this.nextImageElement.style("animation", `${nextAnimation} ${durationMs} ${fillMode}`);
+
+        // 6. Safety timeout to guarantee cleanup in case animationend doesn't fire
+        const safetyTimeout = setTimeout(cleanup, duration + 50);
     }
-    
+   
     private updateStyling(settings: VisualFormattingSettingsModel) {
         const general = settings.generalCard;
         const labels = settings.labelCard;
@@ -274,7 +419,8 @@ export class Visual implements IVisual {
             .style("color", labels.labelColor.value.value);
     }
     
-    private playbackLoop() {
+    private playbackLoop() {         
+
         if (!this.isPlaying) return;
         
         const { frames } = this.viewModel;
@@ -294,6 +440,9 @@ export class Visual implements IVisual {
                     return;
                 }
             }
+
+            // Warm up the target before we switch
+            this.preloadNextImage(this.currentIndex);
 
             if (this.visualSettings.playbackCard.selectionSequence.value) {
                 this.selectionManager.clear();
@@ -353,7 +502,9 @@ export class Visual implements IVisual {
         this.isPlaying ? this.pausePlayback() : this.startPlayback(); 
     }
 
-    private startPlayback() { 
+    private startPlayback() {
+        clearTimeout(this.playbackTimer);
+
         this.isPlaying = true; 
         this.updateButtonIcon(this.playPauseButton, Visual.ICONS.pause);
         this.playbackLoop(); 

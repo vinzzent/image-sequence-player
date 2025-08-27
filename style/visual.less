@@ -1,11 +1,11 @@
 // Variables
-@controls-height: 60px;
+@controls-height: 40px;
 @progress-height: 20px;
-@indicator-size: 24px;
-@collapsed-controls-height: 15px;
+@indicator-size: 16px;
+@collapsed-controls-height: 12px;
 @icon-size: 16px;
-@dot-size: 8px;
-@active-dot-size: 10px;
+@dot-size: 10px;
+@active-dot-size: 12px;
 
 // Main container
 .image-sequence-player {
@@ -23,7 +23,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        min-height: 50px;
+        min-height: 50px; 
     }
 
     // Image container for transitions
@@ -65,6 +65,36 @@
         white-space: nowrap;
     }
 
+    // Progress dots
+    .progress-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: @progress-height;
+        gap: 8px;
+        padding: 0 10px;
+        margin-bottom: 20px;
+
+        .dot {
+            width: @dot-size;
+            height: @dot-size;
+            background-color: #aaa;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background-color: #333;
+            }
+
+            &.active {
+                background-color: #118DFF; // Power BI selection blue
+                width: @active-dot-size;
+                height: @active-dot-size;
+            }
+        }
+    }
+
     // Controls panel
     .controls-wrapper {
         position: relative;
@@ -72,7 +102,7 @@
         flex-shrink: 0;
         height: @collapsed-controls-height;
         transition: height 0.3s ease-in-out;
-        
+
         .panel-indicator {
             position: absolute;
             left: 50%;
@@ -108,14 +138,14 @@
             background-color: rgba(245, 245, 245, 0.9);
             overflow: hidden;
             display: flex;
-            flex-direction: column;
+            align-items: center;
             justify-content: center;
             opacity: 0;
             transition: opacity 0.2s ease;
         }
 
         &.is-expanded {
-            height: @controls-height + @progress-height;
+            height: @controls-height;
             
             .controls-panel {
                 opacity: 1;
@@ -129,35 +159,6 @@
                 svg {
                     transform: rotate(180deg);
                 }
-            }
-        }
-    }
-
-    // Progress dots
-    .progress-indicator {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: @progress-height;
-        gap: 8px;
-        padding: 0 10px;
-        
-        .dot {
-            width: @dot-size;
-            height: @dot-size;
-            background-color: #aaa;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.2s ease;
-
-            &:hover {
-                background-color: #333;
-            }
-
-            &.active {
-                background-color: #118DFF; // Power BI selection blue
-                width: @active-dot-size;
-                height: @active-dot-size;
             }
         }
     }
@@ -179,7 +180,7 @@
             align-items: center;
             justify-content: center;
             border-radius: 4px;
-            
+
             &:hover {
                 background-color: rgba(0, 0, 0, 0.1);
             }

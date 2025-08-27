@@ -109,6 +109,13 @@ class GeneralSettingsCard extends FormattingSettingsSimpleCard {
     name: string = "general";
     displayName: string = "General Settings";
 
+    showProgressIndicator = new formattingSettings.ToggleSwitch({
+        name: "showProgressIndicator",
+        displayName: "Show Navigation Dots",
+        description: "Show or hide the navigation dots below the image.",
+        value: true
+    });
+
     imageAlignment = new formattingSettings.ItemDropdown({
         name: "imageAlignment",
         displayName: "Image Alignment",
@@ -122,7 +129,7 @@ class GeneralSettingsCard extends FormattingSettingsSimpleCard {
         value: { value: "#FFFFFF" }
     });
 
-    slices: FormattingSettingsSlice[] = [this.imageAlignment, this.backgroundColor];
+    slices: FormattingSettingsSlice[] = [this.showProgressIndicator, this.imageAlignment, this.backgroundColor];
 }
 
 /**

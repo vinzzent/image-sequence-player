@@ -6,7 +6,7 @@
       "displayName": "Sequence Order"
     },
     {
-      "name": "imageUrl",
+      "name": "imageUri",
       "kind": "Measure",
       "displayName": "Image URL or SVG Text"
     },
@@ -33,7 +33,7 @@
         "select": [
           {
             "bind": {
-              "to": "imageUrl"
+              "to": "imageUri"
             }
           },
           {
@@ -175,6 +175,13 @@
     "general": {
       "displayName": "General Settings",
       "properties": {
+        "showProgressIndicator": {
+          "displayName": "Show Navigation Dots",
+          "description": "Show or hide the navigation dots below the image.",
+          "type": {
+            "bool": true
+          }
+        },
         "imageAlignment": {
           "displayName": "Image Alignment",
           "type": {

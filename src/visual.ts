@@ -6,6 +6,7 @@ import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel
 import { VisualFormattingSettingsModel } from "./settings";
 
 import IVisual = powerbi.extensibility.visual.IVisual;
+import IVisualEventService = powerbi.extensibility.IVisualEventService;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
@@ -18,7 +19,7 @@ import "./../style/visual.less";
 // --- Interfaces ---
 interface ImageFrame {
     identity: ISelectionId;
-    imageUrl: string;
+    imageUri: string;
     label: string;
 }
 
@@ -34,6 +35,7 @@ interface IconData {
 
 export class Visual implements IVisual {
     private host: IVisualHost;
+    private events: IVisualEventService;
     private selectionManager: ISelectionManager;
     private target: HTMLElement;
     private viewModel: ImageSequenceViewModel;
@@ -53,6 +55,7 @@ export class Visual implements IVisual {
     private isLooping: boolean = false;
     private playbackTimer: number;
     private isTransitioning: boolean = false;
+    private isDataValid: boolean = false;
 
     // --- Lightweight image cache for smooth next-frame transitions ---
     private imageCache: Map<string, HTMLImageElement> = new Map();
@@ -71,6 +74,7 @@ export class Visual implements IVisual {
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
+        this.events = options.host.eventService;
         this.selectionManager = this.host.createSelectionManager();
         this.target = options.element;
         this.formattingSettingsService = new FormattingSettingsService();
@@ -79,27 +83,47 @@ export class Visual implements IVisual {
         this.contentContainer = this.rootElement.append("div").classed("content-container", true);
         this.labelContainer = this.contentContainer.append("div").classed("label-container", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
-        
+
         this.currentImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 1").classed("active", true);
         this.nextImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 2").classed("standby", true);
+        this.progressIndicator = this.rootElement.append("div").classed("progress-indicator", true);
 
         this.setupControls();
     }
 
     public update(options: VisualUpdateOptions) {
+        this.events.renderingStarted(options);
         const dataView = options.dataViews && options.dataViews[0];
         this.visualSettings = this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, dataView);
-        this.viewModel = this.visualTransform(dataView, this.visualSettings);
-        
-        const { frames, settings } = this.viewModel;
-        
-        this.currentIndex = Math.max(0, Math.min(this.currentIndex, frames.length - 1));
-        
-        this.render(this.currentIndex, -1);
-        this.updateStyling(settings);
 
-        // Warm up the very next frame (lazy preload)
-        this.preloadNextImage(this.currentIndex);
+        this.isDataValid = this.isDataViewValid(dataView);
+
+        // Get the view model (either real or placeholder)
+        if (this.isDataValid) {
+            this.viewModel = this.visualTransform(dataView, this.visualSettings);
+        } else {
+            this.viewModel = this.createPlaceholderViewModel(this.visualSettings);
+        }
+
+        const { frames, settings } = this.viewModel;
+        this.currentIndex = Math.max(0, Math.min(this.currentIndex, frames.length - 1));
+
+        // --- Centralized UI State Logic ---
+        if (this.isDataValid) {
+            // If data is valid, apply all user styling and preload the next image.
+            this.updateStyling(settings);
+            this.preloadNextImage(this.currentIndex);
+            this.controlsWrapper.select(".panel-indicator").style("display", "flex");
+        } else {
+            // If data is invalid, explicitly hide all optional controls, overriding any settings.
+            this.progressIndicator.style("display", "none");
+            this.controlsWrapper.select(".panel-indicator").style("display", "none");
+        }
+
+        // Render always runs, showing either the placeholder or the first valid frame.
+        this.render(this.currentIndex, -1);
+
+        this.events.renderingFinished(options);
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
@@ -162,21 +186,21 @@ export class Visual implements IVisual {
 
     /** Preload only the next frame (lazy strategy). */
     private async preloadNextImage(fromIndex: number) {
-    const frames = this.viewModel?.frames;
-    if (!frames || frames.length < 2) return;
+        const frames = this.viewModel?.frames;
+        if (!frames || frames.length < 2) return;
 
-    const nextIndex = (fromIndex + 1) % frames.length;
-    const nextSrc = frames[nextIndex]?.imageUrl;
-    if (!nextSrc) return;
+        const nextIndex = (fromIndex + 1) % frames.length;
+        const nextSrc = frames[nextIndex]?.imageUri;
+        if (!nextSrc) return;
 
-    try {
-        await this.loadAndDecode(nextSrc);
-    } catch { /* ignore errors */ }
-}
+        try {
+            await this.loadAndDecode(nextSrc);
+        } catch { /* ignore errors */ }
+    }
 
     private static createPlaceholderSvg(message: string): string {
         const textStyle = `font-family: 'Segoe UI', sans-serif; font-size: 14px; fill: #666666;`;
-        const textLines = message.split("'").map((line, index) => 
+        const textLines = message.split("'").map((line, index) =>
             `<tspan x="50%" dy="${index === 0 ? '-0.5em' : '1.2em'}">'${line}'</tspan>`
         ).join("");
 
@@ -185,24 +209,36 @@ export class Visual implements IVisual {
                             ${textLines}
                         </text>
                      </svg>`;
-        
+
         return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
     }
 
-    private visualTransform(dataView: DataView, settings: VisualFormattingSettingsModel): ImageSequenceViewModel {
+    private isDataViewValid(dataView: DataView): boolean {
         const categorical = dataView && dataView.categorical;
         if (!categorical || !categorical.categories || !categorical.values) {
-            return this.createPlaceholderViewModel(settings);
+            return false;
         }
 
         const sequenceData = categorical.categories[0];
-        const imageData = categorical.values.find(v => v.source.roles["imageUrl"]);
+        const imageData = categorical.values.find(v => v.source.roles["imageUri"]);
+
+        if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0 || !imageData) {
+            return false;
+        }
+
+        return true; // If all checks pass, the data is valid
+    }
+
+    private visualTransform(dataView: DataView, settings: VisualFormattingSettingsModel): ImageSequenceViewModel {
+        const categorical = dataView.categorical;
+        const sequenceData = categorical.categories[0];
+        const imageData = categorical.values.find(v => v.source.roles["imageUri"]);
         const labelData = categorical.values.find(v => v.source.roles["label"]);
 
         if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0 || !imageData) {
             return this.createPlaceholderViewModel(settings);
         }
-        
+
         const frames: ImageFrame[] = [];
         for (let i = 0; i < sequenceData.values.length; i++) {
             const identity = this.host.createSelectionIdBuilder()
@@ -211,49 +247,97 @@ export class Visual implements IVisual {
 
             const frame: ImageFrame = {
                 identity,
-                imageUrl: this.sanitizeDataUri(imageData.values[i] as string),
+                imageUri: this.uriSanitizer(imageData.values[i] as string),
                 label: labelData ? labelData.values[i] as string : ''
             };
             frames.push(frame);
         }
-        
+
         return { frames, settings };
     }
 
     /**
-     * Sanitizes a data URI by ensuring only the content is URI-encoded.
-     * Mimics Power BI's native handling of SVG data URIs.
-     * e.g., "data:image/svg+xml;utf8,<svg>..." -> "data:image/svg+xml,%3Csvg%3E..."
-     * @param uri The raw data URI string.
-     */
-    private sanitizeDataUri(uri: string): string {
-        if (!uri || !uri.startsWith("data:")) {
-            return uri; // Not a data URI, return as-is (e.g., a regular https URL)
+ * Sanitizes data URIs ONLY and explicitly rejects external URLs.
+ * This is the strict version for Power BI certification.
+ * - It actively blocks any string that looks like a web URL. * 
+ * @param src The raw image source string (expected to be a data URI).
+ * @returns A sanitized data URI string or null if the input is invalid or a blocked URL.
+ */
+    private uriSanitizer(src: string): string | null {
+        if (!src || typeof src !== 'string') {
+            return null;
         }
 
+        const trimmedSrc = src.trim();
+        if (trimmedSrc === '') {
+            return null;
+        }
+
+        // Block external URLs: Use a regex to detect common web protocols.
+        // This is the core logic for meeting Power BI certification requirements.
+        if (/^(https?|ftp):\/\//i.test(trimmedSrc)) {
+            // Explicitly reject external URLs.
+            return null;
+        }
+
+        // Handle data URIs using the same robust, shared logic.
+        if (trimmedSrc.startsWith('data:')) {
+            return this.sanitizeDataUri(trimmedSrc);
+        }
+
+        // If it's not a data URI (and we've already blocked URLs), it's invalid.
+        return null;
+    }
+
+    /**
+     * Internal helper to sanitize the common data URI format based on explicit rules.
+     * @param uri The full data URI string.
+     * @returns A sanitized data URI string or null if malformed.
+     */
+    private sanitizeDataUri(uri: string): string | null {
         const commaIndex = uri.indexOf(',');
         if (commaIndex === -1) {
-            return uri; // Malformed data URI
+            return null; // Malformed: must have a comma separator.
         }
 
-        // Split into prefix ("data:image/svg+xml;utf8") and content ("<svg>...")
         const prefix = uri.substring(0, commaIndex);
         const content = uri.substring(commaIndex + 1);
 
-        // Remove encoding specifiers like ";utf8" or ";base64" from the prefix
-        const cleanedPrefix = prefix.split(';')[0];
+        if (content === undefined) {
+            return null; // Malformed: must have content.
+        }
 
-        // Only encode the content part
-        const encodedContent = encodeURIComponent(content);
+        const isBase64 = prefix.includes(';base64');
+        // Isolate the core media type (e.g., "data:image/png" or "data:image/svg+xml")
+        const mediaType = prefix.split(';')[0];
 
-        return `${cleanedPrefix},${encodedContent}`;
+        if (isBase64) {
+            // --- RULE FOR BASE64 ---
+            // The final prefix must be exactly 'mediaType;base64'.
+            // This rebuilds the prefix cleanly, ensuring no other encodings like ';utf8' remain.
+            // It correctly handles formats like png, jpeg, gif, etc.
+            const finalPrefix = `${mediaType};base64`;
+
+            // The image content must be kept raw and must not be encoded.
+            return `${finalPrefix},${content}`;
+
+        } else {
+            // --- RULE FOR SVG/TEXT ---
+            // The final prefix must only be the media type (e.g., 'data:image/svg+xml').
+            // This explicitly removes any specifiers like ';utf8' or ';charset=...'.
+            const finalPrefix = mediaType;
+
+            // The textual content (like SVG markup) must be URI-encoded for security.
+            const encodedContent = encodeURIComponent(content);
+            return `${finalPrefix},${encodedContent}`;
+        }
     }
 
     private createPlaceholderViewModel(settings: VisualFormattingSettingsModel): ImageSequenceViewModel {
         const placeholderSvg = Visual.createPlaceholderSvg("Please add data to 'Sequence' and 'Image URL or SVG Text' fields.");
         const placeholderFrame: ImageFrame = {
             identity: null,
-            imageUrl: placeholderSvg,
+            imageUri: placeholderSvg,
             label: "Awaiting data"
         };
         return { frames: [placeholderFrame], settings };
@@ -265,7 +349,7 @@ export class Visual implements IVisual {
         svg.append("path").attr("d", iconData.path);
         return button;
     }
-    
+
     private updateButtonIcon(button: Selection<HTMLButtonElement, any, any, any>, iconData: IconData) {
         button.selectAll("*").remove();
         const svg = button.append("svg").attr("viewBox", iconData.viewBox);
@@ -274,7 +358,7 @@ export class Visual implements IVisual {
 
     private setupControls() {
         this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
-        
+
         this.createIconButton(this.controlsWrapper, Visual.ICONS.upArrow)
             .classed("panel-indicator", true)
             .on("click", () => {
@@ -283,7 +367,6 @@ export class Visual implements IVisual {
             });
 
         const panel = this.controlsWrapper.append("div").classed("controls-panel", true);
-        this.progressIndicator = panel.append("div").classed("progress-indicator", true);
         const buttons = panel.append("div").classed("control-buttons", true);
 
         this.createIconButton(buttons, Visual.ICONS.goToStart).on("click", () => this.goToFrame(0));
@@ -303,42 +386,42 @@ export class Visual implements IVisual {
         if (!this.viewModel || !this.viewModel.frames[newIndex] || this.isTransitioning) {
             return;
         }
-    
+
         const { frames } = this.viewModel;
         const newFrame = frames[newIndex];
-    
+
         const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
         const transitionDuration = this.visualSettings.transitionCard.transitionDuration.value;
 
         // On the very first render, just set the image source without transition
         if (oldIndex === -1) {
-            this.currentImageElement.attr("src", newFrame.imageUrl);
+            this.currentImageElement.attr("src", newFrame.imageUri);
         } else if (newIndex !== oldIndex) {
             // Make sure the next image is decoded before we animate
-            this.loadAndDecode(newFrame.imageUrl).then(() => {
-                this.applyTransition(newFrame.imageUrl, transitionType, transitionDuration, isSteppingForward);
+            this.loadAndDecode(newFrame.imageUri).then(() => {
+                this.applyTransition(newFrame.imageUri, transitionType, transitionDuration, isSteppingForward);
             });
         }
-    
+
         const newLabel = this.visualSettings.labelCard.show.value ? newFrame.label : "";
         this.labelContainer.text(newLabel);
-    
+
         const dots = this.progressIndicator.selectAll(".dot").data(frames);
         dots.enter().append("div").classed("dot", true)
             .on("click", (event, d) => {
-        if (this.isTransitioning) return;  // prevent multiple clicks
-        this.selectFrameById(d.identity);
-    });
+                if (this.isTransitioning) return;  // prevent multiple clicks
+                this.selectFrameById(d.identity);
+            });
         dots.classed("active", (d, i) => i === newIndex);
         dots.exit().remove();
-        
+
         this.imageContainer.on("click", () => this.selectFrameById(newFrame.identity));
 
         // After rendering this frame, warm up the next one
         this.preloadNextImage(newIndex);
     }
 
-    private applyTransition(newImageUrl: string, type: string, duration: number, forward: boolean) {
+    private applyTransition(newImageUri: string, type: string, duration: number, forward: boolean) {
         if (this.isTransitioning) return;
         this.isTransitioning = true;
 
@@ -375,7 +458,7 @@ export class Visual implements IVisual {
             clearTimeout(safetyTimeout);
 
             // Reset styles and classes to their resting state
-            this.currentImageElement.style("animation", null).attr("src", newImageUrl).attr("class", "active");
+            this.currentImageElement.style("animation", null).attr("src", newImageUri).attr("class", "active");
             this.nextImageElement.style("animation", null).attr("class", "standby");
 
             this.isTransitioning = false;
@@ -383,7 +466,7 @@ export class Visual implements IVisual {
 
         // 3. Set up the elements for the transition
         this.currentImageElement.attr("class", "current");
-        this.nextImageElement.attr("class", "next").attr("src", newImageUrl);
+        this.nextImageElement.attr("class", "next").attr("src", newImageUri);
 
         // 4. Attach a one-time event listener for cleanup
         nextNode.addEventListener('animationend', cleanup, { once: true });
@@ -398,7 +481,7 @@ export class Visual implements IVisual {
         // 6. Safety timeout to guarantee cleanup in case animationend doesn't fire
         const safetyTimeout = setTimeout(cleanup, duration + 50);
     }
-   
+
     private updateStyling(settings: VisualFormattingSettingsModel) {
         const general = settings.generalCard;
         const labels = settings.labelCard;
@@ -406,9 +489,10 @@ export class Visual implements IVisual {
         this.rootElement
             .style("background-color", general.backgroundColor.value.value)
             .classed("label-above", labels.position.value.value === 'above');
-            
+
         const alignment = general.imageAlignment.value.value as string;
         this.imageContainer.selectAll("img").style("object-fit", alignment);
+        this.progressIndicator.style("display", general.showProgressIndicator.value ? "flex" : "none");
 
         this.labelContainer
             .style("display", labels.show.value ? "block" : "none")
@@ -418,11 +502,11 @@ export class Visual implements IVisual {
             .style("font-style", labels.font.italic.value ? "italic" : "normal")
             .style("color", labels.labelColor.value.value);
     }
-    
-    private playbackLoop() {         
+
+    private playbackLoop() {
 
         if (!this.isPlaying) return;
-        
+
         const { frames } = this.viewModel;
         if (frames.length <= 1 && frames[0].identity === null) {
             this.pausePlayback();
@@ -431,7 +515,7 @@ export class Visual implements IVisual {
 
         this.playbackTimer = window.setTimeout(() => {
             let nextIndex = this.currentIndex + 1;
-            
+
             if (nextIndex >= frames.length) {
                 if (this.isLooping) {
                     nextIndex = 0;
@@ -448,7 +532,7 @@ export class Visual implements IVisual {
                 this.selectionManager.clear();
                 this.selectionManager.select(frames[nextIndex].identity);
             }
-            
+
             this.goToFrame(nextIndex, true);
             this.playbackLoop();
         }, this.visualSettings.playbackCard.defaultFrameDuration.value);
@@ -462,10 +546,10 @@ export class Visual implements IVisual {
             this.goToFrame(index, false);
         }
     }
-    
+
     private goToFrame(index: number, startPlayback: boolean = true) {
         if (this.isTransitioning) return;
-        
+
         if (this.isPlaying && !startPlayback) {
             this.pausePlayback();
         }
@@ -475,20 +559,20 @@ export class Visual implements IVisual {
         this.currentIndex = index;
         this.render(this.currentIndex, oldIndex, isForward);
     }
-    
+
     private step(direction: number) {
         if (this.isTransitioning) return;
-        
+
         if (this.isPlaying) {
             this.pausePlayback();
         }
-        
+
         const { frames } = this.viewModel;
-        if (frames.length <= 1 && frames[0].identity === null) return; 
+        if (frames.length <= 1 && frames[0].identity === null) return;
 
         let newIndex = this.currentIndex + direction;
         const frameCount = frames.length;
-        
+
         if (newIndex >= frameCount) {
             newIndex = this.isLooping ? 0 : frameCount - 1;
         } else if (newIndex < 0) {
@@ -498,20 +582,20 @@ export class Visual implements IVisual {
         this.goToFrame(newIndex, false);
     }
 
-    private togglePlayback() { 
-        this.isPlaying ? this.pausePlayback() : this.startPlayback(); 
+    private togglePlayback() {
+        this.isPlaying ? this.pausePlayback() : this.startPlayback();
     }
 
     private startPlayback() {
         clearTimeout(this.playbackTimer);
 
-        this.isPlaying = true; 
+        this.isPlaying = true;
         this.updateButtonIcon(this.playPauseButton, Visual.ICONS.pause);
-        this.playbackLoop(); 
+        this.playbackLoop();
     }
 
-    private pausePlayback() { 
-        this.isPlaying = false; 
+    private pausePlayback() {
+        this.isPlaying = false;
         this.updateButtonIcon(this.playPauseButton, Visual.ICONS.play);
         clearTimeout(this.playbackTimer);
     }

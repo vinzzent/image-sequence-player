@@ -23,10 +23,10 @@ interface ImageFrame {
     label: string;
 }
 
-interface ImageSequenceViewModel {
-    frames: ImageFrame[];
-    settings: VisualFormattingSettingsModel;
-}
+//interface ImageSequenceViewModel {
+    //frames: ImageFrame[];
+    //settings: VisualFormattingSettingsModel;
+//}
 
 interface IconData {
     viewBox: string;
@@ -38,7 +38,8 @@ export class Visual implements IVisual {
     private events: IVisualEventService;
     private selectionManager: ISelectionManager;
     private target: HTMLElement;
-    private viewModel: ImageSequenceViewModel;
+    //private viewModel: ImageSequenceViewModel;
+    private imageFrames: ImageFrame[] = [];
     private formattingSettingsService: FormattingSettingsService;
     private visualSettings: VisualFormattingSettingsModel;
     private rootElement: d3.Selection<HTMLDivElement, any, any, any>;
@@ -100,24 +101,23 @@ export class Visual implements IVisual {
 
         // Get the view model (either real or placeholder)
         if (this.isDataValid) {
-            this.viewModel = this.visualTransform(dataView, this.visualSettings);
+            this.imageFrames = this.visualTransform(dataView);
         } else {
-            this.viewModel = this.createPlaceholderViewModel(this.visualSettings);
+            this.imageFrames = this.createPlaceholderViewModel();
         }
 
-        const { frames, settings } = this.viewModel;
-        this.currentIndex = Math.max(0, Math.min(this.currentIndex, frames.length - 1));
+        //const { frames, settings } = this.viewModel;
+        this.currentIndex = Math.max(0, Math.min(this.currentIndex, this.imageFrames.length - 1));
 
         // --- Centralized UI State Logic ---
         if (this.isDataValid) {
             // If data is valid, apply all user styling and preload the next image.
-            this.updateStyling(settings);
+            this.updateStyling(this.visualSettings);
             this.preloadNextImage(this.currentIndex);
             this.controlsWrapper.select(".panel-indicator").style("display", "flex");
         } else {
             // If data is invalid, explicitly hide all optional controls, overriding any settings.
-            this.progressIndicator.style("display", "none");
-            this.controlsWrapper.select(".panel-indicator").style("display", "none");
+            this.defaultStyling()
         }
 
         // Render always runs, showing either the placeholder or the first valid frame.
@@ -186,7 +186,7 @@ export class Visual implements IVisual {
 
     /** Preload only the next frame (lazy strategy). */
     private async preloadNextImage(fromIndex: number) {
-        const frames = this.viewModel?.frames;
+        const frames = this.imageFrames;
         if (!frames || frames.length < 2) return;
 
         const nextIndex = (fromIndex + 1) % frames.length;
@@ -229,15 +229,15 @@ export class Visual implements IVisual {
         return true; // If all checks pass, the data is valid
     }
 
-    private visualTransform(dataView: DataView, settings: VisualFormattingSettingsModel): ImageSequenceViewModel {
+    private visualTransform(dataView: DataView): ImageFrame[] {
         const categorical = dataView.categorical;
         const sequenceData = categorical.categories[0];
         const imageData = categorical.values.find(v => v.source.roles["imageUri"]);
         const labelData = categorical.values.find(v => v.source.roles["label"]);
 
-        if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0 || !imageData) {
-            return this.createPlaceholderViewModel(settings);
-        }
+        //if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0 || !imageData) {
+            //return this.createPlaceholderViewModel(settings);
+        //}
 
         const frames: ImageFrame[] = [];
         for (let i = 0; i < sequenceData.values.length; i++) {
@@ -253,7 +253,7 @@ export class Visual implements IVisual {
             frames.push(frame);
         }
 
-        return { frames, settings };
+        return frames;
     }
 
     /**
@@ -333,14 +333,14 @@ export class Visual implements IVisual {
         }
     }
 
-    private createPlaceholderViewModel(settings: VisualFormattingSettingsModel): ImageSequenceViewModel {
+    private createPlaceholderViewModel(): ImageFrame[] {
         const placeholderSvg = Visual.createPlaceholderSvg("Please add data to 'Sequence' and 'Image URL or SVG Text' fields.");
         const placeholderFrame: ImageFrame = {
             identity: null,
             imageUri: placeholderSvg,
             label: "Awaiting data"
         };
-        return { frames: [placeholderFrame], settings };
+        return [placeholderFrame];
     }
 
     private createIconButton(container: Selection<any, any, any, any>, iconData: IconData): Selection<HTMLButtonElement, any, any, any> {
@@ -373,7 +373,7 @@ export class Visual implements IVisual {
         this.createIconButton(buttons, Visual.ICONS.stepBack).on("click", () => this.step(-1));
         this.playPauseButton = this.createIconButton(buttons, Visual.ICONS.play).on("click", () => this.togglePlayback());
         this.createIconButton(buttons, Visual.ICONS.stepForward).on("click", () => this.step(1));
-        this.createIconButton(buttons, Visual.ICONS.goToEnd).on("click", () => this.goToFrame(this.viewModel.frames.length - 1));
+        this.createIconButton(buttons, Visual.ICONS.goToEnd).on("click", () => this.goToFrame(this.imageFrames.length - 1));
         this.createIconButton(buttons, Visual.ICONS.loop)
             .classed("loop-toggle", true)
             .on("click", (event) => {
@@ -383,11 +383,11 @@ export class Visual implements IVisual {
     }
 
     private render(newIndex: number, oldIndex: number, isSteppingForward: boolean = true) {
-        if (!this.viewModel || !this.viewModel.frames[newIndex] || this.isTransitioning) {
+        if (!this.imageFrames || !this.imageFrames[newIndex] || this.isTransitioning) {
             return;
         }
 
-        const { frames } = this.viewModel;
+        const frames = this.imageFrames;
         const newFrame = frames[newIndex];
 
         const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
@@ -503,11 +503,24 @@ export class Visual implements IVisual {
             .style("color", labels.labelColor.value.value);
     }
 
+private defaultStyling() {
+    this.progressIndicator.style("display", "none");    
+    this.controlsWrapper.select(".panel-indicator").style("display", "none");
+    this.controlsWrapper.classed("is-expanded", false);
+    this.labelContainer
+        .style("display", "block" )
+        .style("font-family", "Segoe UI")          // fontFamily default
+        .style("font-size", `12pt`)                // fontSize default
+        .style("font-weight", "normal")            // bold default is false
+        .style("font-style", "normal")             // italic default is false
+        .style("color", "#333333");                // labelColor default
+}
+
     private playbackLoop() {
 
         if (!this.isPlaying) return;
 
-        const { frames } = this.viewModel;
+        const frames = this.imageFrames;
         if (frames.length <= 1 && frames[0].identity === null) {
             this.pausePlayback();
             return;
@@ -541,7 +554,7 @@ export class Visual implements IVisual {
     private selectFrameById(identity: ISelectionId) {
         if (!identity) return;
         this.selectionManager.select(identity);
-        const index = this.viewModel.frames.findIndex(f => f.identity && f.identity.equals(identity));
+        const index = this.imageFrames.findIndex(f => f.identity && f.identity.equals(identity));
         if (index !== -1) {
             this.goToFrame(index, false);
         }
@@ -555,7 +568,7 @@ export class Visual implements IVisual {
         }
 
         const oldIndex = this.currentIndex;
-        const isForward = index > oldIndex || (index === 0 && oldIndex === this.viewModel.frames.length - 1);
+        const isForward = index > oldIndex || (index === 0 && oldIndex === this.imageFrames.length - 1);
         this.currentIndex = index;
         this.render(this.currentIndex, oldIndex, isForward);
     }
@@ -567,7 +580,7 @@ export class Visual implements IVisual {
             this.pausePlayback();
         }
 
-        const { frames } = this.viewModel;
+        const frames = this.imageFrames;
         if (frames.length <= 1 && frames[0].identity === null) return;
 
         let newIndex = this.currentIndex + direction;

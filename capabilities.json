@@ -1,19 +1,19 @@
 {
   "dataRoles": [
     {
-      "name": "sequence",
+      "name": "category",
       "kind": "Grouping",
-      "displayName": "Sequence Order"
+      "displayName": "Category"
     },
     {
       "name": "imageUri",
       "kind": "Measure",
-      "displayName": "Image URL or SVG Text"
+      "displayName": "Image"
     },
     {
-      "name": "label",
+      "name": "value",
       "kind": "Measure",
-      "displayName": "Frame Label (Optional)"
+      "displayName": "Value"
     }
   ],
   "dataViewMappings": [
@@ -21,7 +21,7 @@
     "categorical": {
       "categories": {
         "for": {
-          "in": "sequence"
+          "in": "category"
         },
         "dataReductionAlgorithm": {
           "top": {
@@ -38,7 +38,7 @@
           },
           {
             "bind": {
-              "to": "label"
+              "to": "value"
             }
           }
         ],
@@ -77,27 +77,16 @@
     "transition": {
       "displayName": "Transition Settings",
       "properties": {
+        "show": {
+          "displayName": "Show Navigation Dots",
+          "type": {
+            "bool": true
+          }
+        },
         "transitionType": {
           "displayName": "Transition Type",
           "type": {
-            "enumeration": [
-              {
-                "value": "none",
-                "displayName": "None"
-              },
-              {
-                "value": "fade",
-                "displayName": "Fade"
-              },
-              {
-                "value": "slideHorizontal",
-                "displayName": "Slide Horizontally"
-              },
-              {
-                "value": "slideVertical",
-                "displayName": "Slide Vertically"
-              }
-            ]
+            "enumeration": []
           }
         },
         "transitionDuration": {
@@ -108,16 +97,28 @@
         }
       }
     },
-    "labels": {
-      "displayName": "Label Settings",
+    "caption": {
+      "displayName": "Caption Settings",
       "properties": {
         "show": {
-          "displayName": "Show Labels",
+          "displayName": "Show Caption",
           "type": {
             "bool": true
+          }        
+        },
+        "position": {
+          "displayName": "Position",
+          "type": {
+            "enumeration": []
           }
         },
-        "labelColor": {
+        "type": {
+          "displayName": "Type",
+          "type": {
+            "enumeration": []
+          }
+        },
+        "color": {
           "displayName": "Color",
           "type": {
             "fill": {
@@ -154,51 +155,43 @@
           "type": {
             "bool": true
           }
-        },
-        "position": {
-          "displayName": "Position",
-          "type": {
-            "enumeration": [
-              {
-                "value": "above",
-                "displayName": "Above"
-              },
-              {
-                "value": "below",
-                "displayName": "Below"
-              }
-            ]
-          }
-        }
+        }        
       }
     },
-    "general": {
-      "displayName": "General Settings",
+    "navigation": {
+      "displayName": "Navigation Settings",
       "properties": {
-        "showProgressIndicator": {
+        "show": {
           "displayName": "Show Navigation Dots",
-          "description": "Show or hide the navigation dots below the image.",
           "type": {
             "bool": true
           }
         },
+        "position": {
+          "displayName": "Position",
+          "type": {
+            "enumeration": []
+          }
+        },
+        "activeDotColor": {
+          "displayName": "Active Dot Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        }        
+      }
+    },
+    "general": {
+      "displayName": "General Settings",
+      "properties": {        
         "imageAlignment": {
           "displayName": "Image Alignment",
           "type": {
-            "enumeration": [
-              {
-                "value": "contain",
-                "displayName": "Fit"
-              },
-              {
-                "value": "cover",
-                "displayName": "Fill"
-              },
-              {
-                "value": "scale-down",
-                "displayName": "Center"
-              }
-            ]
+            "enumeration": []            
           }
         },
         "backgroundColor": {

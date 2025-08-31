@@ -9,22 +9,27 @@ import FormattingSettingsSlice = formattingSettings.Slice;
 import FormattingSettingsModel = formattingSettings.Model;
 
 // --- Define dropdown options ---
-const transitionTypeOptions: powerbi.IEnumMember[] = [
-    { value: "none", displayName: "None" },
+const transitionTypeOptions: powerbi.IEnumMember[] = [    
     { value: "fade", displayName: "Fade" },
     { value: "slideHorizontal", displayName: "Slide Horizontally" },
     { value: "slideVertical", displayName: "Slide Vertically" }
 ];
 
-const labelPositionOptions: powerbi.IEnumMember[] = [
-    { value: "below", displayName: "Below" },
-    { value: "above", displayName: "Above" }
+const positionOptions: powerbi.IEnumMember[] = [
+    { value: "top", displayName: "Top" },
+    { value: "bottom", displayName: "Bottom" }
 ];
 
 const imageAlignmentOptions: powerbi.IEnumMember[] = [
     { value: "contain", displayName: "Fit" },
     { value: "cover", displayName: "Fill" },
     { value: "scale-down", displayName: "Center" }
+];
+
+const captionTypeOptions: powerbi.IEnumMember[] = [
+    { value: "category", displayName: "Category" },
+    { value: "value", displayName: "Value" },
+    { value: "category_value", displayName: "Category: Value" }
 ];
 
 // --- Define Formatting Cards ---
@@ -54,11 +59,17 @@ class TransitionSettingsCard extends FormattingSettingsSimpleCard {
     name: string = "transition";
     displayName: string = "Transition Settings";
 
+    show = new formattingSettings.ToggleSwitch({
+        name: "show",
+        displayName: "Enable Transitions",
+        value: true
+    });
+
     transitionType = new formattingSettings.ItemDropdown({
         name: "transitionType",
         displayName: "Transition Type",
         items: transitionTypeOptions,
-        value: transitionTypeOptions[1] // Default to Fade
+        value: transitionTypeOptions[0] // Default to Fade
     });
 
     transitionDuration = new formattingSettings.NumUpDown({
@@ -67,25 +78,40 @@ class TransitionSettingsCard extends FormattingSettingsSimpleCard {
         value: 300
     });
 
+    topLevelSlice: formattingSettings.ToggleSwitch = this.show;
     slices: FormattingSettingsSlice[] = [this.transitionType, this.transitionDuration];
 }
 
-class LabelSettingsCard extends FormattingSettingsSimpleCard {
-    name: string = "labels";
-    displayName: string = "Label Settings";
+class CaptionSettingsCard extends FormattingSettingsSimpleCard {
+    name: string = "caption";
+    displayName: string = "Caption Settings";
 
     show = new formattingSettings.ToggleSwitch({
         name: "show",
         displayName: "Show Labels",
-        value: true
+        value: false
     });
 
-    labelColor = new formattingSettings.ColorPicker({
-        name: "labelColor",
+    position = new formattingSettings.ItemDropdown({
+        name: "position",
+        displayName: "Position",
+        items: positionOptions,
+        value: positionOptions[0] // Default to Top
+    });
+
+    type = new formattingSettings.ItemDropdown({
+        name: "type",
+        displayName: "Type",
+        items: captionTypeOptions,
+        value: captionTypeOptions[0] // Default to Category
+    });
+
+    color = new formattingSettings.ColorPicker({
+        name: "color",
         displayName: "Color",
         value: { value: "#333333" }
     });
-
+    
     font = new formattingSettings.FontControl({
         name: "font",
         displayName: "Font",
@@ -95,26 +121,41 @@ class LabelSettingsCard extends FormattingSettingsSimpleCard {
         italic: new formattingSettings.ToggleSwitch({ name: "italic", value: false })
     });
 
+    topLevelSlice: formattingSettings.ToggleSwitch = this.show;
+    slices: FormattingSettingsSlice[] = [this.position, this.color, this.font];
+}
+
+class NavigationSettingsCard extends FormattingSettingsSimpleCard {
+    name: string = "navigation";
+    displayName: string = "Navigation Settings";
+
+    show = new formattingSettings.ToggleSwitch({
+        name: "show",
+        displayName: "Show Navigation Dots",
+        description: "Show or hide the navigation dots.",
+        value: true
+    });
+
     position = new formattingSettings.ItemDropdown({
         name: "position",
         displayName: "Position",
-        items: labelPositionOptions,
-        value: labelPositionOptions[0] // Default to Below
+        items: positionOptions,
+        value: positionOptions[1] // Default to Top
     });
 
-    slices: FormattingSettingsSlice[] = [this.show, this.labelColor, this.font, this.position];
+    activeDotColor = new formattingSettings.ColorPicker({
+        name: "activeDotColor",
+        displayName: "Color",
+        value: { value: "#118DFF" }
+    });
+
+    topLevelSlice: formattingSettings.ToggleSwitch = this.show;
+    slices: FormattingSettingsSlice[] = [this.position, this.activeDotColor];
 }
 
 class GeneralSettingsCard extends FormattingSettingsSimpleCard {
     name: string = "general";
     displayName: string = "General Settings";
-
-    showProgressIndicator = new formattingSettings.ToggleSwitch({
-        name: "showProgressIndicator",
-        displayName: "Show Navigation Dots",
-        description: "Show or hide the navigation dots below the image.",
-        value: true
-    });
 
     imageAlignment = new formattingSettings.ItemDropdown({
         name: "imageAlignment",
@@ -129,7 +170,7 @@ class GeneralSettingsCard extends FormattingSettingsSimpleCard {
         value: { value: "#FFFFFF" }
     });
 
-    slices: FormattingSettingsSlice[] = [this.showProgressIndicator, this.imageAlignment, this.backgroundColor];
+    slices: FormattingSettingsSlice[] = [this.imageAlignment, this.backgroundColor];
 }
 
 /**
@@ -138,13 +179,15 @@ class GeneralSettingsCard extends FormattingSettingsSimpleCard {
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     playbackCard = new PlaybackSettingsCard();
     transitionCard = new TransitionSettingsCard();
-    labelCard = new LabelSettingsCard();
+    captionCard = new CaptionSettingsCard();
+    navigationCard = new NavigationSettingsCard();
     generalCard = new GeneralSettingsCard();
 
     cards = [
         this.playbackCard,
         this.transitionCard,
-        this.labelCard,
+        this.captionCard,
+        this.navigationCard,
         this.generalCard
     ];
 }

@@ -23,7 +23,8 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        min-height: 50px; 
+        min-height: 50px;
+        margin-bottom: 20px;
     }
 
     // Image container for transitions
@@ -55,8 +56,8 @@
         }
     }
 
-    // Label styling
-    .label-container {
+    // Caption styling
+    .caption-container {
         text-align: center;
         padding: 5px;
         box-sizing: border-box;
@@ -88,7 +89,7 @@
             }
 
             &.active {
-                background-color: #118DFF; // Power BI selection blue
+                background-color: var(--active-dot-color, #118DFF);
                 width: @active-dot-size;
                 height: @active-dot-size;
             }

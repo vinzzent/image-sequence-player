@@ -4,6 +4,7 @@ import powerbi from "powerbi-visuals-api";
 import { select as d3Select, Selection } from "d3-selection";
 import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel";
 import { VisualFormattingSettingsModel } from "./settings";
+import { Renderer } from "./renderVisual";
 
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
@@ -20,17 +21,7 @@ import "./../style/visual.less";
 interface ImageFrame {
     identity: ISelectionId;
     imageUri: string;
-    label: string;
-}
-
-//interface ImageSequenceViewModel {
-    //frames: ImageFrame[];
-    //settings: VisualFormattingSettingsModel;
-//}
-
-interface IconData {
-    viewBox: string;
-    path: string;
+    caption: string;
 }
 
 export class Visual implements IVisual {
@@ -39,39 +30,19 @@ export class Visual implements IVisual {
     private selectionManager: ISelectionManager;
     private target: HTMLElement;
     //private viewModel: ImageSequenceViewModel;
-    private imageFrames: ImageFrame[] = [];
+    private imageFrames: ImageFrame[];
     private formattingSettingsService: FormattingSettingsService;
     private visualSettings: VisualFormattingSettingsModel;
     private rootElement: d3.Selection<HTMLDivElement, any, any, any>;
     private contentContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
+    private captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private currentImageElement: d3.Selection<HTMLImageElement, any, any, any>;
     private nextImageElement: d3.Selection<HTMLImageElement, any, any, any>;
-    private labelContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     private progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
-    private playPauseButton: d3.Selection<HTMLButtonElement, any, any, any>;
-    private currentIndex: number = 0;
-    private isPlaying: boolean = false;
-    private isLooping: boolean = false;
-    private playbackTimer: number;
-    private isTransitioning: boolean = false;
     private isDataValid: boolean = false;
-
-    // --- Lightweight image cache for smooth next-frame transitions ---
-    private imageCache: Map<string, HTMLImageElement> = new Map();
-    private readonly maxCacheEntries: number = 8;
-
-    private static ICONS: { [key: string]: IconData } = {
-        play: { viewBox: "0 0 24 24", path: "M8 5v14l11-7z" },
-        pause: { viewBox: "0 0 24 24", path: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" },
-        goToStart: { viewBox: "0 0 24 24", path: "M6 6h2v12H6zm3.5 6l8.5 6V6z" },
-        stepBack: { viewBox: "0 0 24 24", path: "M11 18V6l-8.5 6 8.5 6zm-2-6l6 4.5V7.5l-6 4.5z" },
-        stepForward: { viewBox: "0 0 24 24", path: "M13 6v12l8.5-6-8.5-6zm2 6l-6-4.5v9l6-4.5z" },
-        goToEnd: { viewBox: "0 0 24 24", path: "M16 6h2v12h-2zm-3.5 6l-8.5 6V6z" },
-        loop: { viewBox: "0 0 24 24", path: "M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" },
-        upArrow: { viewBox: "0 0 24 24", path: "M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z" }
-    };
+    private renderer: Renderer;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
@@ -79,17 +50,26 @@ export class Visual implements IVisual {
         this.selectionManager = this.host.createSelectionManager();
         this.target = options.element;
         this.formattingSettingsService = new FormattingSettingsService();
-
         this.rootElement = d3Select(this.target).append("div").classed("image-sequence-player", true);
         this.contentContainer = this.rootElement.append("div").classed("content-container", true);
-        this.labelContainer = this.contentContainer.append("div").classed("label-container", true);
+        this.captionContainer = this.contentContainer.append("div").classed("caption-container", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
-
+        this.progressIndicator = this.rootElement.append("div").classed("progress-indicator", true);
+        this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
         this.currentImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 1").classed("active", true);
         this.nextImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 2").classed("standby", true);
-        this.progressIndicator = this.rootElement.append("div").classed("progress-indicator", true);
+        this.imageFrames = [];
+        this.renderer = new Renderer({
+            selectionManager: this.selectionManager,
+            controlsWrapper: this.controlsWrapper,
+            progressIndicator: this.progressIndicator,
+            imageContainer: this.imageContainer,
+            captionContainer: this.captionContainer,
+            currentImageElement: this.currentImageElement,
+            nextImageElement: this.nextImageElement
+        });
 
-        this.setupControls();
+        //this.setupControls();
     }
 
     public update(options: VisualUpdateOptions) {
@@ -97,105 +77,32 @@ export class Visual implements IVisual {
         const dataView = options.dataViews && options.dataViews[0];
         this.visualSettings = this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, dataView);
 
+        // Validate the incoming data
         this.isDataValid = this.isDataViewValid(dataView);
 
         // Get the view model (either real or placeholder)
         if (this.isDataValid) {
-            this.imageFrames = this.visualTransform(dataView);
+            this.imageFrames = this.transformDataViewToFrames(dataView);
         } else {
-            this.imageFrames = this.createPlaceholderViewModel();
+            this.imageFrames = this.createAwaitingDataFrames();
         }
-
-        //const { frames, settings } = this.viewModel;
-        this.currentIndex = Math.max(0, Math.min(this.currentIndex, this.imageFrames.length - 1));
 
         // --- Centralized UI State Logic ---
         if (this.isDataValid) {
-            // If data is valid, apply all user styling and preload the next image.
+            this.moveLabelContainer(this.visualSettings.captionCard.position.value.value as "top" | "bottom");
+            this.moveProgressIndicator(this.visualSettings.navigationCard.position.value.value as "top" | "bottom");
             this.updateStyling(this.visualSettings);
-            this.preloadNextImage(this.currentIndex);
-            this.controlsWrapper.select(".panel-indicator").style("display", "flex");
         } else {
-            // If data is invalid, explicitly hide all optional controls, overriding any settings.
             this.defaultStyling()
         }
 
-        // Render always runs, showing either the placeholder or the first valid frame.
-        this.render(this.currentIndex, -1);
+        this.renderer.render(this.imageFrames, this.visualSettings);
 
         this.events.renderingFinished(options);
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         return this.formattingSettingsService.buildFormattingModel(this.visualSettings);
-    }
-
-    /**
-     * Return a decoded HTMLImageElement for a given src, using a small LRU cache.
-     * Ensures the image is decoded before we transition, minimizing flicker.
-     */
-    private async loadAndDecode(src: string): Promise<HTMLImageElement> {
-        if (!src) return null as any;
-
-        // If we already cached it, refresh LRU order and ensure decode
-        const cached = this.imageCache.get(src);
-        if (cached) {
-            // Refresh LRU order
-            this.imageCache.delete(src);
-            this.imageCache.set(src, cached);
-
-            if (typeof (cached as any).decode === "function") {
-                try { await cached.decode(); } catch { /* ignore */ }
-            } else if (!cached.complete) {
-                await new Promise<void>(resolve => {
-                    cached.onload = () => resolve();
-                    cached.onerror = () => resolve();
-                });
-            }
-            return cached;
-        }
-
-        // Not cached: create, set src, and wait
-        const img = new Image();
-        const wait = new Promise<void>(resolve => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve(); // fail-safe: still resolve
-        });
-        img.src = src;
-
-        // Wait for load/decode
-        await wait;
-        if (typeof (img as any).decode === "function") {
-            try { await img.decode(); } catch { /* ignore */ }
-        }
-
-        // Insert into cache and evict if needed
-        this.imageCache.set(src, img);
-        this.evictOldestIfNeeded();
-
-        return img;
-    }
-
-    /** Keep cache small to avoid memory pressure. */
-    private evictOldestIfNeeded() {
-        while (this.imageCache.size > this.maxCacheEntries) {
-            const oldestKey = this.imageCache.keys().next().value;
-            this.imageCache.delete(oldestKey);
-        }
-    }
-
-    /** Preload only the next frame (lazy strategy). */
-    private async preloadNextImage(fromIndex: number) {
-        const frames = this.imageFrames;
-        if (!frames || frames.length < 2) return;
-
-        const nextIndex = (fromIndex + 1) % frames.length;
-        const nextSrc = frames[nextIndex]?.imageUri;
-        if (!nextSrc) return;
-
-        try {
-            await this.loadAndDecode(nextSrc);
-        } catch { /* ignore errors */ }
     }
 
     private static createPlaceholderSvg(message: string): string {
@@ -229,30 +136,70 @@ export class Visual implements IVisual {
         return true; // If all checks pass, the data is valid
     }
 
-    private visualTransform(dataView: DataView): ImageFrame[] {
+    /**
+     * Transforms the dataView into an array of ImageFrame objects.
+     * Each frame represents an image with its associated data.
+     * The caption for each frame is dynamically determined based on the visual's format settings.
+     *
+     * @param dataView The DataView object provided by Power BI.
+     * @returns An array of ImageFrame objects.
+     */
+    private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
         const categorical = dataView.categorical;
-        const sequenceData = categorical.categories[0];
-        const imageData = categorical.values.find(v => v.source.roles["imageUri"]);
-        const labelData = categorical.values.find(v => v.source.roles["label"]);
+        if (!categorical || !categorical.categories || !categorical.categories[0] || !categorical.values) {
+            return []; // Return empty if data structure is not as expected
+        }
 
-        //if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0 || !imageData) {
-            //return this.createPlaceholderViewModel(settings);
-        //}
+        const categoryData = categorical.categories[0];
+        const imageData = categorical.values.find(v => v.source.roles["imageUri"]);
+        const valueData = categorical.values.find(v => v.source.roles["value"]);
+
+        // Ensure essential data fields are present
+        if (!imageData || !categoryData.values) {
+            return [];
+        }
 
         const frames: ImageFrame[] = [];
-        for (let i = 0; i < sequenceData.values.length; i++) {
+
+        const captionsEnabled = this.visualSettings.captionCard.show.value;
+        const captionType = this.visualSettings.captionCard.type.value.value as string;
+
+        for (let i = 0; i < categoryData.values.length; i++) {
             const identity = this.host.createSelectionIdBuilder()
-                .withCategory(sequenceData, i)
+                .withCategory(categoryData, i)
                 .createSelectionId();
+
+            let captionText = ''; // Default to an empty caption.
+
+            // Only process captions if the feature is enabled in the format pane.
+            if (captionsEnabled) {
+                const category = categoryData.values[i] as string;
+                // Use an empty string if valueData is not available for the current item.
+                const value = valueData && valueData.values[i] ? valueData.values[i] as string : '';
+                
+                switch (captionType) {
+                    case "value":
+                        captionText = value;
+                        break;
+                    case "category_value":
+                        // Combine category and value, ensuring a clean output if value is missing.
+                        captionText = value ? `${category}: ${value}` : category;
+                        break;
+                    case "category":
+                    default:
+                        // Default case handles "category" type.
+                        captionText = category;
+                        break;
+                }
+            }
 
             const frame: ImageFrame = {
                 identity,
                 imageUri: this.uriSanitizer(imageData.values[i] as string),
-                label: labelData ? labelData.values[i] as string : ''
+                caption: captionText // Assign the dynamically generated caption.
             };
             frames.push(frame);
         }
-
         return frames;
     }
 
@@ -333,283 +280,73 @@ export class Visual implements IVisual {
         }
     }
 
-    private createPlaceholderViewModel(): ImageFrame[] {
+    private createAwaitingDataFrames(): ImageFrame[] {
         const placeholderSvg = Visual.createPlaceholderSvg("Please add data to 'Sequence' and 'Image URL or SVG Text' fields.");
         const placeholderFrame: ImageFrame = {
             identity: null,
             imageUri: placeholderSvg,
-            label: "Awaiting data"
+            caption: "Awaiting data"
         };
         return [placeholderFrame];
     }
 
-    private createIconButton(container: Selection<any, any, any, any>, iconData: IconData): Selection<HTMLButtonElement, any, any, any> {
-        const button = container.append("button");
-        const svg = button.append("svg").attr("viewBox", iconData.viewBox);
-        svg.append("path").attr("d", iconData.path);
-        return button;
+    /**
+ * Move the caption container relative to the image container
+ * @param position "above" | "below"
+ */
+    private moveLabelContainer(position: "top" | "bottom") {
+        if (position === "top") {
+            this.captionContainer.node()?.parentNode?.insertBefore(this.captionContainer.node()!, this.imageContainer.node());
+        } else {
+            this.imageContainer.node()?.parentNode?.insertBefore(this.captionContainer.node()!, this.imageContainer.node()?.nextSibling || null);
+        }
     }
 
-    private updateButtonIcon(button: Selection<HTMLButtonElement, any, any, any>, iconData: IconData) {
-        button.selectAll("*").remove();
-        const svg = button.append("svg").attr("viewBox", iconData.viewBox);
-        svg.append("path").attr("d", iconData.path);
-    }
-
-    private setupControls() {
-        this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
-
-        this.createIconButton(this.controlsWrapper, Visual.ICONS.upArrow)
-            .classed("panel-indicator", true)
-            .on("click", () => {
-                const isExpanded = this.controlsWrapper.classed("is-expanded");
-                this.controlsWrapper.classed("is-expanded", !isExpanded);
-            });
-
-        const panel = this.controlsWrapper.append("div").classed("controls-panel", true);
-        const buttons = panel.append("div").classed("control-buttons", true);
-
-        this.createIconButton(buttons, Visual.ICONS.goToStart).on("click", () => this.goToFrame(0));
-        this.createIconButton(buttons, Visual.ICONS.stepBack).on("click", () => this.step(-1));
-        this.playPauseButton = this.createIconButton(buttons, Visual.ICONS.play).on("click", () => this.togglePlayback());
-        this.createIconButton(buttons, Visual.ICONS.stepForward).on("click", () => this.step(1));
-        this.createIconButton(buttons, Visual.ICONS.goToEnd).on("click", () => this.goToFrame(this.imageFrames.length - 1));
-        this.createIconButton(buttons, Visual.ICONS.loop)
-            .classed("loop-toggle", true)
-            .on("click", (event) => {
-                this.isLooping = !this.isLooping;
-                d3Select(event.currentTarget).classed("active", this.isLooping);
-            });
-    }
-
-    private render(newIndex: number, oldIndex: number, isSteppingForward: boolean = true) {
-        if (!this.imageFrames || !this.imageFrames[newIndex] || this.isTransitioning) {
-            return;
+    /**
+     * Move the progress indicator relative to the content container
+     * @param position "above" | "below"
+     */
+    private moveProgressIndicator(position: "top" | "bottom") {
+        if (position === "top") {
+            this.rootElement.node()?.insertBefore(this.progressIndicator.node()!, this.contentContainer.node());
+        } else {
+            this.rootElement.node()?.insertBefore(this.progressIndicator.node()!, this.contentContainer.node()?.nextSibling || null);
         }
-
-        const frames = this.imageFrames;
-        const newFrame = frames[newIndex];
-
-        const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
-        const transitionDuration = this.visualSettings.transitionCard.transitionDuration.value;
-
-        // On the very first render, just set the image source without transition
-        if (oldIndex === -1) {
-            this.currentImageElement.attr("src", newFrame.imageUri);
-        } else if (newIndex !== oldIndex) {
-            // Make sure the next image is decoded before we animate
-            this.loadAndDecode(newFrame.imageUri).then(() => {
-                this.applyTransition(newFrame.imageUri, transitionType, transitionDuration, isSteppingForward);
-            });
-        }
-
-        const newLabel = this.visualSettings.labelCard.show.value ? newFrame.label : "";
-        this.labelContainer.text(newLabel);
-
-        const dots = this.progressIndicator.selectAll(".dot").data(frames);
-        dots.enter().append("div").classed("dot", true)
-            .on("click", (event, d) => {
-                if (this.isTransitioning) return;  // prevent multiple clicks
-                this.selectFrameById(d.identity);
-            });
-        dots.classed("active", (d, i) => i === newIndex);
-        dots.exit().remove();
-
-        this.imageContainer.on("click", () => this.selectFrameById(newFrame.identity));
-
-        // After rendering this frame, warm up the next one
-        this.preloadNextImage(newIndex);
-    }
-
-    private applyTransition(newImageUri: string, type: string, duration: number, forward: boolean) {
-        if (this.isTransitioning) return;
-        this.isTransitioning = true;
-
-        const nextNode = this.nextImageElement.node();
-        if (!nextNode) {
-            this.isTransitioning = false;
-            return;
-        }
-
-        // 1. Determine animation names based on type and direction
-        let currentAnimation: string, nextAnimation: string;
-        const direction = forward ? 'fwd' : 'rev';
-
-        switch (type) {
-            case 'slideHorizontal':
-                currentAnimation = direction === 'fwd' ? 'slideOutToRight' : 'slideOutToLeft';
-                nextAnimation = direction === 'fwd' ? 'slideInFromLeft' : 'slideInFromRight';
-                break;
-            case 'slideVertical':
-                currentAnimation = direction === 'fwd' ? 'slideOutToBottom' : 'slideOutToTop';
-                nextAnimation = direction === 'fwd' ? 'slideInFromTop' : 'slideInFromBottom';
-                break;
-            case 'fade':
-            default:
-                currentAnimation = 'fadeOut';
-                nextAnimation = 'fadeIn';
-                break;
-        }
-
-        // 2. Define the cleanup logic to run after animation completes
-        const cleanup = () => {
-            // Remove event listener to prevent leaks
-            nextNode.removeEventListener('animationend', cleanup);
-            clearTimeout(safetyTimeout);
-
-            // Reset styles and classes to their resting state
-            this.currentImageElement.style("animation", null).attr("src", newImageUri).attr("class", "active");
-            this.nextImageElement.style("animation", null).attr("class", "standby");
-
-            this.isTransitioning = false;
-        };
-
-        // 3. Set up the elements for the transition
-        this.currentImageElement.attr("class", "current");
-        this.nextImageElement.attr("class", "next").attr("src", newImageUri);
-
-        // 4. Attach a one-time event listener for cleanup
-        nextNode.addEventListener('animationend', cleanup, { once: true });
-
-        // 5. Apply the animations dynamically
-        const durationMs = `${duration}ms`;
-        const fillMode = 'forwards'; // Ensures the element holds its final animated state
-
-        this.currentImageElement.style("animation", `${currentAnimation} ${durationMs} ${fillMode}`);
-        this.nextImageElement.style("animation", `${nextAnimation} ${durationMs} ${fillMode}`);
-
-        // 6. Safety timeout to guarantee cleanup in case animationend doesn't fire
-        const safetyTimeout = setTimeout(cleanup, duration + 50);
     }
 
     private updateStyling(settings: VisualFormattingSettingsModel) {
         const general = settings.generalCard;
-        const labels = settings.labelCard;
+        const navigation = settings.navigationCard;
+        const caption = settings.captionCard;
 
         this.rootElement
             .style("background-color", general.backgroundColor.value.value)
-            .classed("label-above", labels.position.value.value === 'above');
+        //.classed("label-above", caption.position.value.value === 'above');
 
         const alignment = general.imageAlignment.value.value as string;
         this.imageContainer.selectAll("img").style("object-fit", alignment);
-        this.progressIndicator.style("display", general.showProgressIndicator.value ? "flex" : "none");
-
-        this.labelContainer
-            .style("display", labels.show.value ? "block" : "none")
-            .style("font-family", labels.font.fontFamily.value)
-            .style("font-size", `${labels.font.fontSize.value}pt`)
-            .style("font-weight", labels.font.bold.value ? "bold" : "normal")
-            .style("font-style", labels.font.italic.value ? "italic" : "normal")
-            .style("color", labels.labelColor.value.value);
+        this.progressIndicator.style("display", navigation.show.value ? "flex" : "none");
+        this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
+        this.controlsWrapper.select(".panel-indicator").style("display", "flex");
+        this.captionContainer
+            .style("display", caption.show.value ? "block" : "none")
+            .style("font-family", caption.font.fontFamily.value)
+            .style("font-size", `${caption.font.fontSize.value}pt`)
+            .style("font-weight", caption.font.bold.value ? "bold" : "normal")
+            .style("font-style", caption.font.italic.value ? "italic" : "normal")
+            .style("color", caption.color.value.value);
     }
 
-private defaultStyling() {
-    this.progressIndicator.style("display", "none");    
-    this.controlsWrapper.select(".panel-indicator").style("display", "none");
-    this.controlsWrapper.classed("is-expanded", false);
-    this.labelContainer
-        .style("display", "block" )
-        .style("font-family", "Segoe UI")          // fontFamily default
-        .style("font-size", `12pt`)                // fontSize default
-        .style("font-weight", "normal")            // bold default is false
-        .style("font-style", "normal")             // italic default is false
-        .style("color", "#333333");                // labelColor default
-}
-
-    private playbackLoop() {
-
-        if (!this.isPlaying) return;
-
-        const frames = this.imageFrames;
-        if (frames.length <= 1 && frames[0].identity === null) {
-            this.pausePlayback();
-            return;
-        }
-
-        this.playbackTimer = window.setTimeout(() => {
-            let nextIndex = this.currentIndex + 1;
-
-            if (nextIndex >= frames.length) {
-                if (this.isLooping) {
-                    nextIndex = 0;
-                } else {
-                    this.pausePlayback();
-                    return;
-                }
-            }
-
-            // Warm up the target before we switch
-            this.preloadNextImage(this.currentIndex);
-
-            if (this.visualSettings.playbackCard.selectionSequence.value) {
-                this.selectionManager.clear();
-                this.selectionManager.select(frames[nextIndex].identity);
-            }
-
-            this.goToFrame(nextIndex, true);
-            this.playbackLoop();
-        }, this.visualSettings.playbackCard.defaultFrameDuration.value);
-    }
-
-    private selectFrameById(identity: ISelectionId) {
-        if (!identity) return;
-        this.selectionManager.select(identity);
-        const index = this.imageFrames.findIndex(f => f.identity && f.identity.equals(identity));
-        if (index !== -1) {
-            this.goToFrame(index, false);
-        }
-    }
-
-    private goToFrame(index: number, startPlayback: boolean = true) {
-        if (this.isTransitioning) return;
-
-        if (this.isPlaying && !startPlayback) {
-            this.pausePlayback();
-        }
-
-        const oldIndex = this.currentIndex;
-        const isForward = index > oldIndex || (index === 0 && oldIndex === this.imageFrames.length - 1);
-        this.currentIndex = index;
-        this.render(this.currentIndex, oldIndex, isForward);
-    }
-
-    private step(direction: number) {
-        if (this.isTransitioning) return;
-
-        if (this.isPlaying) {
-            this.pausePlayback();
-        }
-
-        const frames = this.imageFrames;
-        if (frames.length <= 1 && frames[0].identity === null) return;
-
-        let newIndex = this.currentIndex + direction;
-        const frameCount = frames.length;
-
-        if (newIndex >= frameCount) {
-            newIndex = this.isLooping ? 0 : frameCount - 1;
-        } else if (newIndex < 0) {
-            newIndex = this.isLooping ? frameCount - 1 : 0;
-        }
-
-        this.goToFrame(newIndex, false);
-    }
-
-    private togglePlayback() {
-        this.isPlaying ? this.pausePlayback() : this.startPlayback();
-    }
-
-    private startPlayback() {
-        clearTimeout(this.playbackTimer);
-
-        this.isPlaying = true;
-        this.updateButtonIcon(this.playPauseButton, Visual.ICONS.pause);
-        this.playbackLoop();
-    }
-
-    private pausePlayback() {
-        this.isPlaying = false;
-        this.updateButtonIcon(this.playPauseButton, Visual.ICONS.play);
-        clearTimeout(this.playbackTimer);
+    private defaultStyling() {
+        this.progressIndicator.style("display", "none");
+        this.controlsWrapper.select(".panel-indicator").style("display", "none");
+        this.controlsWrapper.classed("is-expanded", false);
+        this.captionContainer
+            .style("display", "block")
+            .style("font-family", "Segoe UI")          // fontFamily default
+            .style("font-size", `12pt`)                // fontSize default
+            .style("font-weight", "normal")            // bold default is false
+            .style("font-style", "normal")             // italic default is false
+            .style("color", "#333333");                // caption color default
     }
 }

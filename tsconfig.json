@@ -6,7 +6,8 @@
         "target": "es2022",
         "sourceMap": true,
         "outDir": "./.tmp/build/",
-        "moduleResolution": "node",
+        "module": "node16",
+        "moduleResolution": "node16",
         "declaration": true,
         "lib": [
             "es2022",

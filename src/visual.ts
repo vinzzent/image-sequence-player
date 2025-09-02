@@ -165,6 +165,7 @@ export class Visual implements IVisual {
      */
     private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
     const categorical = dataView.categorical;
+    console.log(categorical);
     const categories = categorical.categories.find(c => c.source.roles?.["category"]);
     const categoryFormat = categories?.source?.format;
 

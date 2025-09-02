@@ -3,11 +3,14 @@
 import powerbi from "powerbi-visuals-api";
 import { select as d3Select, Selection } from "d3-selection";
 import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel";
+import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
+import { ITooltipServiceWrapper, createTooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { VisualFormattingSettingsModel } from "./settings";
 import { Renderer } from "./renderVisual";
 
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
+import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
@@ -17,19 +20,28 @@ import DataView = powerbi.DataView;
 
 import "./../style/visual.less";
 
+type Formatter = ReturnType<typeof valueFormatter.create>;
+
 // --- Interfaces ---
 interface ImageFrame {
     identity: ISelectionId;
     imageUri: string;
     caption: string;
+    tooltips: VisualTooltipDataItem[];
+    opacity: number;
+}
+
+interface Formatters {
+    forCategory: Formatter;
+    forValue: Formatter;
+    forTooltips: Formatter[];
 }
 
 export class Visual implements IVisual {
     private host: IVisualHost;
     private events: IVisualEventService;
     private selectionManager: ISelectionManager;
-    private target: HTMLElement;
-    //private viewModel: ImageSequenceViewModel;
+    private target: HTMLElement;    
     private imageFrames: ImageFrame[];
     private formattingSettingsService: FormattingSettingsService;
     private visualSettings: VisualFormattingSettingsModel;
@@ -43,13 +55,15 @@ export class Visual implements IVisual {
     private progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     private isDataValid: boolean = false;
     private renderer: Renderer;
+    private formatters: Formatters;
+    private tooltipServiceWrapper: ITooltipServiceWrapper;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
         this.events = options.host.eventService;
         this.selectionManager = this.host.createSelectionManager();
         this.target = options.element;
-        this.formattingSettingsService = new FormattingSettingsService();
+        this.formattingSettingsService = new FormattingSettingsService();       
         this.rootElement = d3Select(this.target).append("div").classed("image-sequence-player", true);
         this.contentContainer = this.rootElement.append("div").classed("content-container", true);
         this.captionContainer = this.contentContainer.append("div").classed("caption-container", true);
@@ -59,6 +73,10 @@ export class Visual implements IVisual {
         this.currentImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 1").classed("active", true);
         this.nextImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 2").classed("standby", true);
         this.imageFrames = [];
+        this.tooltipServiceWrapper = createTooltipServiceWrapper(
+            options.host.tooltipService,
+            options.element
+        );
         this.renderer = new Renderer({
             selectionManager: this.selectionManager,
             controlsWrapper: this.controlsWrapper,
@@ -66,7 +84,8 @@ export class Visual implements IVisual {
             imageContainer: this.imageContainer,
             captionContainer: this.captionContainer,
             currentImageElement: this.currentImageElement,
-            nextImageElement: this.nextImageElement
+            nextImageElement: this.nextImageElement,
+            tooltipServiceWrapper: this.tooltipServiceWrapper
         });
 
         //this.setupControls();
@@ -139,69 +158,111 @@ export class Visual implements IVisual {
     /**
      * Transforms the dataView into an array of ImageFrame objects.
      * Each frame represents an image with its associated data.
-     * The caption for each frame is dynamically determined based on the visual's format settings.
+     * The caption and tooltip for each frame are dynamically determined based on the visual's format settings.
      *
      * @param dataView The DataView object provided by Power BI.
      * @returns An array of ImageFrame objects.
      */
     private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
-        const categorical = dataView.categorical;
-        if (!categorical || !categorical.categories || !categorical.categories[0] || !categorical.values) {
-            return []; // Return empty if data structure is not as expected
-        }
+    const categorical = dataView.categorical;
+    const categories = categorical.categories.find(c => c.source.roles?.["category"]);
+    const categoryFormat = categories?.source?.format;
 
-        const categoryData = categorical.categories[0];
-        const imageData = categorical.values.find(v => v.source.roles["imageUri"]);
-        const valueData = categorical.values.find(v => v.source.roles["value"]);
+    const valuesData = categorical.values.find(v => v.source.roles?.["value"]);
+    const valueFormat = valuesData?.source?.format;
 
-        // Ensure essential data fields are present
-        if (!imageData || !categoryData.values) {
-            return [];
-        }
+    const tooltipData = categorical.values.filter(v => v.source.roles?.["tooltips"]);
+    const tooltipFormats = tooltipData?.map(v => v.source?.format) || [];
 
-        const frames: ImageFrame[] = [];
+    const imageData = categorical.values.find(v => v.source.roles?.["imageUri"]);
 
-        const captionsEnabled = this.visualSettings.captionCard.show.value;
-        const captionType = this.visualSettings.captionCard.type.value.value as string;
+    this.formatters = {
+        forCategory: categories ? valueFormatter.create({ format: categoryFormat }) : undefined,
+        forValue: valuesData ? valueFormatter.create({ format: valueFormat }) : undefined,
+        forTooltips: tooltipFormats.map(f => valueFormatter.create({ format: f }))
+    };
 
-        for (let i = 0; i < categoryData.values.length; i++) {
-            const identity = this.host.createSelectionIdBuilder()
-                .withCategory(categoryData, i)
-                .createSelectionId();
-
-            let captionText = ''; // Default to an empty caption.
-
-            // Only process captions if the feature is enabled in the format pane.
-            if (captionsEnabled) {
-                const category = categoryData.values[i] as string;
-                // Use an empty string if valueData is not available for the current item.
-                const value = valueData && valueData.values[i] ? valueData.values[i] as string : '';
-                
-                switch (captionType) {
-                    case "value":
-                        captionText = value;
-                        break;
-                    case "category_value":
-                        // Combine category and value, ensuring a clean output if value is missing.
-                        captionText = value ? `${category}: ${value}` : category;
-                        break;
-                    case "category":
-                    default:
-                        // Default case handles "category" type.
-                        captionText = category;
-                        break;
-                }
-            }
-
-            const frame: ImageFrame = {
-                identity,
-                imageUri: this.uriSanitizer(imageData.values[i] as string),
-                caption: captionText // Assign the dynamically generated caption.
-            };
-            frames.push(frame);
-        }
-        return frames;
+    if (!categories?.values || !imageData?.values) {
+        return [];
     }
+
+    const imageHighlights = imageData?.highlights;
+    const valueHighlights = valuesData?.highlights;
+    const isAnyHighlightActive = imageHighlights !== undefined || valueHighlights !== undefined;
+
+    const frames: ImageFrame[] = [];
+    const captionsEnabled = this.visualSettings.captionCard.show.value;
+    const captionType = this.visualSettings.captionCard.type.value.value as string;
+
+    for (let i = 0; i < categories.values.length; i++) {
+        const identity = this.host.createSelectionIdBuilder()
+            .withCategory(categories, i)
+            .createSelectionId();
+
+        let opacity = 1.0; // Default to full opacity
+        if (isAnyHighlightActive) {
+            const hasValueRoleAndHighlights = !!(valuesData?.values && valueHighlights);
+            const valueRaw = hasValueRoleAndHighlights ? valuesData.values[i] as number : null;
+            const valueHighlight = hasValueRoleAndHighlights ? valueHighlights[i] as number : null;
+            const isUriHighlighted = imageHighlights ? imageHighlights[i] !== null : false;
+
+            if (hasValueRoleAndHighlights && valueHighlight !== null && valueRaw !== null) {
+                const ratio = valueRaw > 0 ? valueHighlight / valueRaw : 0;
+                opacity = Math.max(0.2, ratio); // Proportional with 20% minimum
+            } else if (isUriHighlighted) {
+                opacity = 1.0; // Fully highlighted
+            } else {
+                opacity = 0.2; // Dimmed
+            }
+        }
+
+        let captionText = '';
+        const tooltipItems: VisualTooltipDataItem[] = [];
+
+        const categoryRaw = categories.values[i];
+        const formattedCategory = this.formatters.forCategory
+            ? this.formatters.forCategory.format(categoryRaw)
+            : String(categoryRaw);
+        tooltipItems.push({ displayName: categories.source.displayName, value: formattedCategory });
+
+        let formattedValue = '';
+        if (valuesData) {
+            const valueRaw = valuesData.values[i];
+            formattedValue = this.formatters.forValue && valueRaw !== undefined
+                ? this.formatters.forValue.format(valueRaw)
+                : valueRaw !== undefined ? String(valueRaw) : '';
+            tooltipItems.push({ displayName: valuesData.source.displayName, value: formattedValue });
+        }
+
+        tooltipData.forEach((measure, index) => {
+            const measureValue = measure.values[i];
+            if (measureValue !== undefined) {
+                const formattedMeasure = this.formatters.forTooltips[index].format(measureValue);
+                tooltipItems.push({ displayName: measure.source.displayName, value: formattedMeasure });
+            }
+        });
+
+        if (captionsEnabled) {
+            switch (captionType) {
+                case "value": captionText = formattedValue; break;
+                case "category_value": captionText = formattedValue ? `${formattedCategory}: ${formattedValue}` : formattedCategory; break;
+                case "category": default: captionText = formattedCategory; break;
+            }
+        }
+
+        const frame: ImageFrame = {
+            identity,
+            imageUri: this.uriSanitizer(imageData.values[i] as string),
+            caption: captionText,
+            tooltips: tooltipItems,
+            opacity: opacity
+        };
+        frames.push(frame);
+    }
+    return frames;
+}
+
+
 
     /**
  * Sanitizes data URIs ONLY and explicitly rejects external URLs.
@@ -285,7 +346,9 @@ export class Visual implements IVisual {
         const placeholderFrame: ImageFrame = {
             identity: null,
             imageUri: placeholderSvg,
-            caption: "Awaiting data"
+            caption: "Awaiting data",
+            tooltips: undefined,
+            opacity: 1.0
         };
         return [placeholderFrame];
     }

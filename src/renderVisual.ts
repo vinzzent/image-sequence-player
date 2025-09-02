@@ -1,13 +1,17 @@
 import { VisualFormattingSettingsModel } from "./settings";
 import { select as d3Select, Selection } from "d3-selection";
+import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import ISelectionId = powerbi.visuals.ISelectionId;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
+import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 
 // --- Interfaces ---
 interface ImageFrame {
     identity: ISelectionId;
     imageUri: string;
     caption: string;
+    tooltips: VisualTooltipDataItem[];
+    opacity: number;
 }
 
 interface IconData {
@@ -23,12 +27,14 @@ interface RenderedOptions {
     captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
     currentImageElement: d3.Selection<HTMLImageElement, any, any, any>;
     nextImageElement: d3.Selection<HTMLImageElement, any, any, any>;
+    tooltipServiceWrapper: ITooltipServiceWrapper;
 }
 
 export class Renderer {
     private selectionManager: ISelectionManager;
     private imageFrames: ImageFrame[];
     private visualSettings: VisualFormattingSettingsModel;
+    private tooltipServiceWrapper: ITooltipServiceWrapper;
     private imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private currentImageElement: d3.Selection<HTMLImageElement, any, any, any>;
     private nextImageElement: d3.Selection<HTMLImageElement, any, any, any>;
@@ -67,6 +73,7 @@ export class Renderer {
         this.nextImageElement = options.nextImageElement
         this.imageFrames = [];
         this.visualSettings = {} as VisualFormattingSettingsModel;
+        this.tooltipServiceWrapper = options.tooltipServiceWrapper;
 
         this.setupControls();
 
@@ -90,11 +97,10 @@ export class Renderer {
         this.preloadImage(nextIndex);
         const frame = frames[currentIndex];
         const shouldAnimate = oldIndex !== -1 && currentIndex !== oldIndex;
+
         if (!shouldAnimate) {
-            // First render or no index change
             this.currentImageElement.attr("src", frame.imageUri);
         } else {
-            // Animate transition
             this.loadAndDecode(frame.imageUri).then(() => {
                 const { show: hasTransition, transitionType, transitionDuration } =
                     this.visualSettings.transitionCard;
@@ -113,19 +119,36 @@ export class Renderer {
 
         const newCaption = this.visualSettings.captionCard.show.value ? frame.caption : "";
         this.captionContainer.text(newCaption);
-        const dots = this.progressIndicator.selectAll(".dot").data(frames);
-        dots.enter().append("div").classed("dot", true)
+        this.currentImageElement.attr("alt", newCaption || "Image");
+
+        const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(frames);
+
+        dots.exit().remove();
+
+        const dotsEnter = dots.enter().append("div").classed("dot", true)
             .on("click", (event, d) => {
-                if (this.isTransitioning) return;  // prevent multiple clicks
+                if (this.isTransitioning) return;
                 this.selectFrameById(d.identity);
             });
-        dots.classed("active", (d, i) => i === currentIndex);
-        dots.exit().remove();
+
+        dotsEnter.merge(dots)
+            .classed("active", (d, i) => i === currentIndex)
+            .style("opacity", d => d.opacity);
+
         this.imageContainer.on("click", () => this.selectFrameById(frame.identity));
 
-        // After rendering this frame, warm up the next one
-    }
+        this.tooltipServiceWrapper.addTooltip(
+            this.progressIndicator.selectAll(".dot"),
+            (datum: ImageFrame) => datum.tooltips,
+            (datum: ImageFrame) => datum.identity
+        );
 
+        this.tooltipServiceWrapper.addTooltip(
+            this.imageContainer,
+            () => frames[currentIndex].tooltips,
+            () => frames[currentIndex].identity
+        );
+    }
     /**
      * Return a decoded HTMLImageElement for a given src, using a small LRU cache.
      * Ensures the image is decoded before we transition, minimizing flicker.

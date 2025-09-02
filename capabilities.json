@@ -14,20 +14,33 @@
       "name": "value",
       "kind": "Measure",
       "displayName": "Value"
+    },
+    {
+      "name": "tooltips",
+      "kind": "Measure",
+      "displayName": "Tooltips"
     }
   ],
   "dataViewMappings": [
-  {
+  {"conditions": [
+        {
+          "category": {
+            "max": 1
+          },
+          "imageUri": {
+            "max": 1
+          },
+          "value": {
+            "max": 1
+          }
+        }
+      ],
     "categorical": {
       "categories": {
         "for": {
           "in": "category"
         },
-        "dataReductionAlgorithm": {
-          "top": {
-            "count": 3500
-          }
-        }
+        "dataReductionAlgorithm": { "top": { "count": 3500 } }
       },
       "values": {
         "select": [
@@ -40,13 +53,13 @@
             "bind": {
               "to": "value"
             }
+          },
+          {
+            "bind": {
+              "to": "tooltips"
+            }
           }
-        ],
-        "dataReductionAlgorithm": {
-          "top": {
-            "count": 3500
-          }
-        }
+        ]
       }
     }
   }
@@ -206,6 +219,17 @@
         }
       }
     }
+  },
+  "supportsHighlight": true,
+  "tooltips": {
+    "supportedTypes": {
+      "default": true,
+      "canvas": true
+    },
+    "supportEnhancedTooltips": true,
+    "roles": [
+      "tooltips"
+    ]
   },
   "privileges": []
 }

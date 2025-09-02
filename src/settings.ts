@@ -122,7 +122,7 @@ class CaptionSettingsCard extends FormattingSettingsSimpleCard {
     });
 
     topLevelSlice: formattingSettings.ToggleSwitch = this.show;
-    slices: FormattingSettingsSlice[] = [this.position, this.color, this.font];
+    slices: FormattingSettingsSlice[] = [this.position, this.type, this.color, this.font];
 }
 
 class NavigationSettingsCard extends FormattingSettingsSimpleCard {

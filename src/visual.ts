@@ -136,7 +136,7 @@ export class Visual implements IVisual {
                         </text>
                      </svg>`;
 
-        return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+        return `data:image/svg+xml,${encodeURIComponent(svg)}`;
     }
 
     private isDataViewValid(dataView: DataView): boolean {
@@ -155,15 +155,15 @@ export class Visual implements IVisual {
         return true; // If all checks pass, the data is valid
     }
 
-    /**
-     * Transforms the dataView into an array of ImageFrame objects.
-     * Each frame represents an image with its associated data.
-     * The caption and tooltip for each frame are dynamically determined based on the visual's format settings.
-     *
-     * @param dataView The DataView object provided by Power BI.
-     * @returns An array of ImageFrame objects.
-     */
-    private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
+   /**
+ * Transforms the dataView into an array of ImageFrame objects.
+ * Each frame represents an image with its associated data.
+ * The caption and tooltip for each frame are dynamically determined based on the visual's format settings.
+ *
+ * @param dataView The DataView object provided by Power BI.
+ * @returns An array of ImageFrame objects.
+ */
+private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
     const categorical = dataView.categorical;
     console.log(categorical);
     const categories = categorical.categories.find(c => c.source.roles?.["category"]);
@@ -188,8 +188,7 @@ export class Visual implements IVisual {
     }
 
     const imageHighlights = imageData?.highlights;
-    const valueHighlights = valuesData?.highlights;
-    const isAnyHighlightActive = imageHighlights !== undefined || valueHighlights !== undefined;
+    const isAnyHighlightActive = imageHighlights !== undefined;
 
     const frames: ImageFrame[] = [];
     const captionsEnabled = this.visualSettings.captionCard.show.value;
@@ -200,20 +199,12 @@ export class Visual implements IVisual {
             .withCategory(categories, i)
             .createSelectionId();
 
-        let opacity = 1.0; // Default to full opacity
+        // --- Only image highlight logic ---
+        let opacity = 1.0; 
         if (isAnyHighlightActive) {
-            const hasValueRoleAndHighlights = !!(valuesData?.values && valueHighlights);
-            const valueRaw = hasValueRoleAndHighlights ? valuesData.values[i] as number : null;
-            const valueHighlight = hasValueRoleAndHighlights ? valueHighlights[i] as number : null;
-            const isUriHighlighted = imageHighlights ? imageHighlights[i] !== null : false;
-
-            if (hasValueRoleAndHighlights && valueHighlight !== null && valueRaw !== null) {
-                const ratio = valueRaw > 0 ? valueHighlight / valueRaw : 0;
-                opacity = Math.max(0.2, ratio); // Proportional with 20% minimum
-            } else if (isUriHighlighted) {
-                opacity = 1.0; // Fully highlighted
-            } else {
-                opacity = 0.2; // Dimmed
+            const highlightVal = imageHighlights ? imageHighlights[i] : null;
+            if (highlightVal === null || highlightVal === "") {
+                opacity = 0.2; // Dimmed when not highlighted
             }
         }
 
@@ -264,8 +255,7 @@ export class Visual implements IVisual {
 }
 
 
-
-    /**
+/**
  * Sanitizes data URIs ONLY and explicitly rejects external URLs.
  * This is the strict version for Power BI certification.
  * - It actively blocks any string that looks like a web URL. * 

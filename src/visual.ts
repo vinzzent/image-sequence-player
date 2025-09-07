@@ -57,6 +57,8 @@ export class Visual implements IVisual {
     private renderer: Renderer;
     private formatters: Formatters;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
+    private static readonly INVALID_MESSAGE: string = "Please add data to 'Category' and 'Image' fields.";
+    private static readonly BLOCK_EXTERNAL_URLS: boolean = true;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
@@ -256,12 +258,13 @@ private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
 
 
 /**
- * Sanitizes data URIs ONLY and explicitly rejects external URLs.
- * This is the strict version for Power BI certification.
- * - It actively blocks any string that looks like a web URL. * 
- * @param src The raw image source string (expected to be a data URI).
- * @returns A sanitized data URI string or null if the input is invalid or a blocked URL.
- */
+     * Sanitizes a URI based on the static `BLOCK_EXTERNAL_URLS` policy.
+     * If the policy is true, it strictly allows only data URIs.
+     * If the policy is false, it validates and allows `http` or `httpsa` URLs.
+     *
+     * @param src The raw image source string.
+     * @returns A sanitized URI string or null if the input is invalid or blocked by policy.
+     */
     private uriSanitizer(src: string): string | null {
         if (!src || typeof src !== 'string') {
             return null;
@@ -272,20 +275,34 @@ private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
             return null;
         }
 
-        // Block external URLs: Use a regex to detect common web protocols.
-        // This is the core logic for meeting Power BI certification requirements.
-        if (/^(https?|ftp):\/\//i.test(trimmedSrc)) {
-            // Explicitly reject external URLs.
-            return null;
-        }
-
-        // Handle data URIs using the same robust, shared logic.
-        if (trimmedSrc.startsWith('data:')) {
+        // Data URIs are self-contained and always processed first.
+        if (trimmedSrc.toLowerCase().startsWith('data:')) {
             return this.sanitizeDataUri(trimmedSrc);
         }
 
-        // If it's not a data URI (and we've already blocked URLs), it's invalid.
-        return null;
+        // Check the policy for handling external URLs.
+        if (Visual.BLOCK_EXTERNAL_URLS) {
+            // **Strict Mode**: Since it's not a data URI, it's blocked.
+            console.warn('External URL blocked: Visual is in certified mode (BLOCK_EXTERNAL_URLS is true).');
+            return null;
+        } else {
+            // **Flexible Mode**: Attempt to validate the URL.
+            try {
+                const url = new URL(trimmedSrc);
+
+                // **Sanitization**: Explicitly allow only 'http:' and 'https:' protocols
+                // to prevent security risks from protocols like 'javascript:' or 'file:'.
+                if (url.protocol === 'http:' || url.protocol === 'https:') {
+                    return url.href; // Return the normalized, valid URL.
+                }
+
+                // Reject URLs with other protocols.
+                return null;
+            } catch (error) {
+                // The URL constructor failed, meaning the URL is malformed.
+                return null;
+            }
+        }
     }
 
     /**
@@ -333,7 +350,7 @@ private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
     }
 
     private createAwaitingDataFrames(): ImageFrame[] {
-        const placeholderSvg = Visual.createPlaceholderSvg("Please add data to 'Sequence' and 'Image URL or SVG Text' fields.");
+        const placeholderSvg = Visual.createPlaceholderSvg(Visual.INVALID_MESSAGE);
         const placeholderFrame: ImageFrame = {
             identity: null,
             imageUri: placeholderSvg,

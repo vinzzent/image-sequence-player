@@ -48,11 +48,19 @@ export class Renderer {
     private isLooping: boolean = false;
     private playbackTimer: number;
     private isTransitioning: boolean = false;
+    private isFallbackImage: boolean = false;
     // --- Lightweight image cache for smooth next-frame transitions ---
     private imageCache: Map<string, HTMLImageElement> = new Map();
     private readonly maxCacheEntries: number = 8;
 
-    private static ICONS: { [key: string]: IconData } = {
+    private static readonly FALLBACK_SVG: string = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
+                                                    <g opacity="0.5">
+                                                        <path d="m20 20.8.8-.8L.8 0 0 .8Z" style="fill:#d40000"/>
+                                                        <path d="M15.4 6.9a1.5 1.5 0 1 1-1.5-1.5 1.5 1.5 0 0 1 1.5 1.5ZM1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z"/>
+                                                        <path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z"/>
+                                                    </g></svg>`;
+
+    private static readonly ICONS: { [key: string]: IconData } = {
         play: { viewBox: "0 0 24 24", path: "M8 5v14l11-7z" },
         pause: { viewBox: "0 0 24 24", path: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" },
         goToStart: { viewBox: "0 0 24 24", path: "M6 6h2v12H6zm3.5 6l8.5 6V6z" },
@@ -91,35 +99,40 @@ export class Renderer {
         if (!this.imageFrames || !this.imageFrames[currentIndex] || this.isTransitioning) {
             return;
         }
+        
+        this.isFallbackImage = false;
 
         const frames = this.imageFrames;
+        const frame = frames[currentIndex];
         const nextIndex = (currentIndex + 1) % frames.length;
         this.preloadImage(nextIndex);
-        const frame = frames[currentIndex];
-        const shouldAnimate = oldIndex !== -1 && currentIndex !== oldIndex;
 
-        if (!shouldAnimate) {
-            this.currentImageElement.attr("src", frame.imageUri);
-        } else {
-            this.loadAndDecode(frame.imageUri).then(() => {
-                const { show: hasTransition, transitionType, transitionDuration } =
-                    this.visualSettings.transitionCard;
-                if (hasTransition.value) {
-                    this.applyTransition(
-                        frame.imageUri,
-                        transitionType.value.value as string,
-                        transitionDuration.value,
-                        isSteppingForward
-                    );
-                } else {
-                    this.currentImageElement.attr("src", frame.imageUri);
-                }
-            });
-        }
+        this.loadAndDecode(frame.imageUri).then((decodedImg) => {
+            console.log("Image loaded:", frame.imageUri);
+            if (this.currentIndex !== currentIndex || !decodedImg) {                
+                return; // Abort if state changed while image was loading (race condition)
+            }
+
+            const { show: hasTransition, transitionType, transitionDuration } =
+                this.visualSettings.transitionCard;
+            const shouldAnimate = oldIndex !== -1 && currentIndex !== oldIndex && hasTransition.value;
+
+            this.applyTransition(
+                decodedImg,
+                shouldAnimate ? transitionType.value.value as string : "fade",
+                shouldAnimate ? transitionDuration.value : 0,
+                isSteppingForward
+            );
+        });
 
         const newCaption = this.visualSettings.captionCard.show.value ? frame.caption : "";
+
+        // Update caption container
         this.captionContainer.text(newCaption);
-        this.currentImageElement.attr("alt", newCaption || "Image");
+
+        // Update image alt text
+        const altText = this.isFallbackImage ? "Error image" : (newCaption || "Image");
+        this.currentImageElement.attr("alt", altText);
 
         const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(frames);
 
@@ -149,17 +162,23 @@ export class Renderer {
             () => frames[currentIndex].identity
         );
     }
-    /**
-     * Return a decoded HTMLImageElement for a given src, using a small LRU cache.
-     * Ensures the image is decoded before we transition, minimizing flicker.
-     */
-    private async loadAndDecode(src: string): Promise<HTMLImageElement> {
-        if (!src) return null as any;
 
-        // If we already cached it, refresh LRU order and ensure decode
+    private useFallbackSvg(svgString: string): HTMLImageElement {
+        const fallbackImage = new Image();
+        const encodedSvg = encodeURIComponent(svgString);
+        fallbackImage.src = `data:image/svg+xml,${encodedSvg}`;
+        this.isFallbackImage = true;
+        return fallbackImage;
+    }
+
+    private async loadAndDecode(src: string): Promise<HTMLImageElement> {
+        if (!src) {
+            // immediately return fallback, no need to assign .src
+            return this.useFallbackSvg(Renderer.FALLBACK_SVG);
+        }
+
         const cached = this.imageCache.get(src);
         if (cached) {
-            // Refresh LRU order
             this.imageCache.delete(src);
             this.imageCache.set(src, cached);
 
@@ -174,28 +193,24 @@ export class Renderer {
             return cached;
         }
 
-        // Not cached: create, set src, and wait
         const img = new Image();
-        const wait = new Promise<void>(resolve => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve(); // fail-safe: still resolve
+        const wait = new Promise<HTMLImageElement>(resolve => {
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(this.useFallbackSvg(Renderer.FALLBACK_SVG));
         });
         img.src = src;
 
-        // Wait for load/decode
-        await wait;
-        if (typeof (img as any).decode === "function") {
-            try { await img.decode(); } catch { /* ignore */ }
+        const loadedImage = await wait;
+        if (typeof (loadedImage as any).decode === "function") {
+            try { await loadedImage.decode(); } catch { /* ignore */ }
         }
 
-        // Insert into cache and evict if needed
-        this.imageCache.set(src, img);
+        this.imageCache.set(src, loadedImage);
         this.evictOldestIfNeeded();
 
-        return img;
+        return loadedImage;
     }
 
-    /** Keep cache small to avoid memory pressure. */
     private evictOldestIfNeeded() {
         while (this.imageCache.size > this.maxCacheEntries) {
             const oldestKey = this.imageCache.keys().next().value;
@@ -203,17 +218,28 @@ export class Renderer {
         }
     }
 
-    private applyTransition(newImageUri: string, type: string, duration: number, forward: boolean) {
+    private applyTransition(newImageElement: HTMLImageElement, type: string, duration: number, forward: boolean) {
         if (this.isTransitioning) return;
         this.isTransitioning = true;
 
-        const nextNode = this.nextImageElement.node();
-        if (!nextNode) {
+        const standbyNode = this.nextImageElement.node();
+        if (standbyNode?.parentNode) {
+            standbyNode.parentNode.replaceChild(newImageElement, standbyNode);
+        } else {
+            this.imageContainer.node().appendChild(newImageElement);
+        }
+        this.nextImageElement = d3Select(newImageElement);
+
+        if (duration === 0) {
+            this.currentImageElement.attr("class", "standby");
+            this.nextImageElement.attr("class", "active");
+            const temp = this.currentImageElement;
+            this.currentImageElement = this.nextImageElement;
+            this.nextImageElement = temp;
             this.isTransitioning = false;
             return;
         }
 
-        // 1. Determine animation names based on type and direction
         let currentAnimation: string, nextAnimation: string;
         const direction = forward ? 'fwd' : 'rev';
 
@@ -233,34 +259,32 @@ export class Renderer {
                 break;
         }
 
-        // 2. Define the cleanup logic to run after animation completes
+        const nextNode = this.nextImageElement.node();
         const cleanup = () => {
-            // Remove event listener to prevent leaks
             nextNode.removeEventListener('animationend', cleanup);
             clearTimeout(safetyTimeout);
 
-            // Reset styles and classes to their resting state
-            this.currentImageElement.style("animation", null).attr("src", newImageUri).attr("class", "active");
+            const oldCurrent = this.currentImageElement;
+            this.currentImageElement = this.nextImageElement;
+            this.nextImageElement = oldCurrent;
+
+            this.currentImageElement.style("animation", null).attr("class", "active");
             this.nextImageElement.style("animation", null).attr("class", "standby");
 
             this.isTransitioning = false;
         };
 
-        // 3. Set up the elements for the transition
         this.currentImageElement.attr("class", "current");
-        this.nextImageElement.attr("class", "next").attr("src", newImageUri);
+        this.nextImageElement.attr("class", "next");
 
-        // 4. Attach a one-time event listener for cleanup
         nextNode.addEventListener('animationend', cleanup, { once: true });
 
-        // 5. Apply the animations dynamically
         const durationMs = `${duration}ms`;
-        const fillMode = 'forwards'; // Ensures the element holds its final animated state
+        const fillMode = 'forwards';
 
         this.currentImageElement.style("animation", `${currentAnimation} ${durationMs} ${fillMode}`);
         this.nextImageElement.style("animation", `${nextAnimation} ${durationMs} ${fillMode}`);
 
-        // 6. Safety timeout to guarantee cleanup in case animationend doesn't fire
         const safetyTimeout = setTimeout(cleanup, duration + 50);
     }
 
@@ -269,7 +293,6 @@ export class Renderer {
         this.selectionManager.select(identity);
         const index = this.imageFrames.findIndex(f => f.identity && f.identity.equals(identity));
         if (index !== -1) {
-            //this.preloadImage(index);
             this.goToFrame(index, false);
         }
     }
@@ -307,8 +330,6 @@ export class Renderer {
     }
 
     private setupControls() {
-        //this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
-
         this.createIconButton(this.controlsWrapper, Renderer.ICONS.upArrow)
             .classed("panel-indicator", true)
             .on("click", () => {

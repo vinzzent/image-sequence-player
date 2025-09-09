@@ -33,10 +33,8 @@
         position: relative;
         overflow: hidden;
         cursor: pointer;
-
         /* declare a default alignment */
         --alignment: contain;
-
         img {
             position: absolute;
             top: 0;
@@ -44,22 +42,26 @@
             width: 100%;
             height: 100%;
             backface-visibility: hidden;
-            /* Helps prevent flickering */
             object-fit: var(--alignment);
-            /* alignment controlled here */
-
-            // Base states to handle both resting (.active/.standby)
-            // and transitioning (.current/.next) classes.
+            // Base states
             &.active,
             &.current {
                 opacity: 1;
                 z-index: 1;
             }
-
             &.standby,
             &.next {
                 opacity: 0;
-                z-index: 2; // Next image is on top to slide over the current one.
+                z-index: 2;
+            }
+            // Fade visibility toggles
+            &.hidden {
+                opacity: 0;
+                transition: opacity 0.25s ease;
+            }
+            &.visible {
+                opacity: 1;
+                transition: opacity 0.25s ease;
             }
         }
 
@@ -70,7 +72,11 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 10;
-            display: none; // hidden by default
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            &.visible {
+                opacity: 1;
+            }
         }
     }
 
@@ -86,26 +92,39 @@
 
     // Progress dots
     .progress-indicator {
-        display: flex;
-        justify-content: center;
+        display: flex; /* Default state is visible */
         align-items: center;
         height: @progress-height;
         gap: 8px;
         padding: 0 10px;
         margin-bottom: 20px;
-
+        overflow-x: auto;
+        padding-bottom: 5px;
+        white-space: nowrap;
+        min-width: 100%;
+        &::-webkit-scrollbar {
+            height: 5px;
+        }
+        &::-webkit-scrollbar-thumb {
+            background-color: #c1c1c1;
+            border-radius: 5px;
+        }
+        &::before,
+        &::after {
+            content: '';
+            flex-grow: 1;
+        }
         .dot {
+            flex-shrink: 0;
             width: @dot-size;
             height: @dot-size;
             background-color: var(--dot-color, #605E5C);
             border-radius: 50%;
             cursor: pointer;
             transition: all 0.2s ease;
-
             &:hover {
                 background-color: var(--hovered-dot-color, #605E5C);
             }
-
             &.active {
                 background-color: var(--active-dot-color, #0078d4);
                 width: @active-dot-size;
@@ -115,17 +134,14 @@
     }
 
     // --- High Contrast Mode Styles ---
-    // These styles use CSS custom properties (variables) set from TypeScript.
     &.highcontrast {
         .progress-indicator .dot {
-            // Inactive dots are outlines using the theme's background and foreground colors.            
             border: 2px solid var(--dot-border-color, #605E5C);
-            box-sizing: border-box;            
-            &:hover {                
+            box-sizing: border-box;
+            &:hover {
                 border-color: var(--hovered-dot-border-color, #605E5C);
             }
-            // The active dot is a solid shape using the 'selected' color.
-            &.active {                
+            &.active {
                 border: none;
             }
         }
@@ -138,8 +154,8 @@
         flex-shrink: 0;
         height: @collapsed-controls-height;
         transition: height 0.3s ease-in-out;
-
         .panel-indicator {
+            display: flex; /* Default state is visible */
             position: absolute;
             left: 50%;
             bottom: 0;
@@ -151,23 +167,19 @@
             border-radius: 5px;
             z-index: 10;
             transition: bottom 0.3s ease-in-out;
-            display: flex;
             align-items: center;
             justify-content: center;
             padding: 0;
-
             svg {
                 width: @indicator-size;
                 height: @indicator-size;
                 fill: #555;
                 transition: transform 0.3s ease-in-out;
             }
-
             &:hover {
                 background-color: rgba(220, 220, 220, 0.95);
             }
         }
-
         .controls-panel {
             width: 100%;
             height: 100%;
@@ -179,19 +191,15 @@
             opacity: 0;
             transition: opacity 0.2s ease;
         }
-
         &.is-expanded {
             height: @controls-height;
-
             .controls-panel {
                 opacity: 1;
                 transition-delay: 0.1s;
             }
-
             .panel-indicator {
                 bottom: 100%;
                 margin-bottom: 2px;
-
                 svg {
                     transform: rotate(180deg);
                 }
@@ -206,7 +214,6 @@
         align-items: center;
         height: @controls-height;
         gap: 15px;
-
         button {
             background: none;
             border: none;
@@ -216,140 +223,57 @@
             align-items: center;
             justify-content: center;
             border-radius: 4px;
-
             &:hover {
                 background-color: rgba(0, 0, 0, 0.1);
             }
-
             svg {
                 width: @icon-size;
                 height: @icon-size;
                 fill: #333;
             }
-
             &.loop-toggle.active {
                 background-color: rgba(0, 0, 0, 0.2);
             }
         }
     }
+    
+    // --- UTILITY CLASS FOR FORMAT PANE TOGGLES ---
+    .hidden {
+        display: none !important;
+    }
+
+    // --- STYLES FOR WHEN DATA IS INVALID ---
+    &.is-invalid {
+        .progress-indicator,
+        .controls-wrapper .panel-indicator {
+            display: none;
+        }
+
+        .controls-wrapper {
+            &.is-expanded {
+                height: @collapsed-controls-height;
+            }
+        }
+        
+        .caption-container {
+            display: block;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 12pt;
+            font-weight: normal;
+            font-style: normal;
+            color: #333333;
+        }
+    }
 }
 
 /* --- KEYFRAME ANIMATION ENGINE --- */
-// FADE
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-
-    to {
-        opacity: 0;
-    }
-}
-
-// SLIDE HORIZONTAL
-@keyframes slideInFromRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToLeft {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-}
-
-@keyframes slideInFromLeft {
-    from {
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToRight {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-}
-
-// SLIDE VERTICAL
-@keyframes slideInFromBottom {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToTop {
-    from {
-        transform: translateY(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-}
-
-@keyframes slideInFromTop {
-    from {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToBottom {
-    from {
-        transform: translateY(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes slideInFromRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOutToLeft { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-100%); opacity: 0; } }
+@keyframes slideInFromLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOutToRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+@keyframes slideInFromBottom { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideOutToTop { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
+@keyframes slideInFromTop { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideOutToBottom { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }

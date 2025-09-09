@@ -130,17 +130,20 @@ export class Renderer {
 
         const firstFrame = imageFrames[this.currentIndex];
 
+        // Show spinner, hide image
         if (!this.isInitialLoading) {
-            this.currentImageElement.style("display", "none");
-            this.spinnerElement.style("display", "block");
+            this.currentImageElement.classed("hidden", true)
+                .classed("visible", false);
+            this.spinnerElement.classed("visible", true);
             this.isInitialLoading = true;
         }
 
-        // Load the first image (will use cache if available)
+        // After image is loaded
         this.loadAndDecode(firstFrame.imageUri).then(decodedImg => {
             if (this.isInitialLoading) {
-                this.spinnerElement.style("display", "none");
-                this.currentImageElement.style("display", "block");
+                this.spinnerElement.classed("visible", false); // fade out spinner
+                this.currentImageElement.classed("hidden", false)
+                    .classed("visible", true); // fade in image
                 this.isInitialLoading = false;
             }
 
@@ -155,7 +158,7 @@ export class Renderer {
         if (!this.imageFrames || !this.imageFrames[currentIndex] || this.isTransitioning) {
             return;
         }
-
+        
         this.isFallbackImage = false;
 
         const frames = this.imageFrames;
@@ -163,11 +166,15 @@ export class Renderer {
         const nextIndex = (currentIndex + 1) % frames.length;
         this.preloadImage(nextIndex);
 
+        const newCaption = this.visualSettings.captionCard.show.value ? frame.caption : "";
+
         this.loadAndDecode(frame.imageUri).then((decodedImg) => {
             console.log("Image loaded:", frame.imageUri);
             if (this.currentIndex !== currentIndex || !decodedImg) {
                 return; // Abort if state changed while image was loading (race condition)
             }
+            const altText = this.isFallbackImage ? "Error image" : (newCaption || "Image");
+            this.currentImageElement.attr("alt", altText);
 
             const { show: hasTransition, transitionType, transitionDuration } =
                 this.visualSettings.transitionCard;
@@ -179,16 +186,10 @@ export class Renderer {
                 shouldAnimate ? transitionDuration.value : 0,
                 isSteppingForward
             );
-        });
-
-        const newCaption = this.visualSettings.captionCard.show.value ? frame.caption : "";
+        });        
 
         // Update caption container
         this.captionContainer.text(newCaption);
-
-        // Update image alt text
-        const altText = this.isFallbackImage ? "Error image" : (newCaption || "Image");
-        this.currentImageElement.attr("alt", altText);
 
         const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(frames);
 
@@ -239,41 +240,60 @@ export class Renderer {
 
     private async loadAndDecode(src: string): Promise<HTMLImageElement> {
         if (!src) {
-            // immediately return fallback, no need to assign .src
+            // Immediately return fallback for an empty source.
             return this.useFallbackSvg(Renderer.FALLBACK_SVG);
         }
-
+    
         const cached = this.imageCache.get(src);
-        if (cached) {
+        if (cached) {            
             this.imageCache.delete(src);
             this.imageCache.set(src, cached);
-
+            
+            // Optional: Re-run decode/check if not complete, as before.
             if (typeof (cached as any).decode === "function") {
                 try { await cached.decode(); } catch { /* ignore */ }
             } else if (!cached.complete) {
                 await new Promise<void>(resolve => {
                     cached.onload = () => resolve();
-                    cached.onerror = () => resolve();
+                    cached.onerror = () => resolve(); // Should not happen if cached, but safe.
                 });
             }
             return cached;
         }
-
+    
         const img = new Image();
+        // This flag tracks if the image loaded successfully.
+        let isLoadSuccessful = false;
+    
         const wait = new Promise<HTMLImageElement>(resolve => {
-            img.onload = () => resolve(img);
-            img.onerror = () => resolve(this.useFallbackSvg(Renderer.FALLBACK_SVG));
+            img.onload = () => {
+                // On success, set the flag to true and resolve with the image.
+                isLoadSuccessful = true;
+                resolve(img);
+            };
+            img.onerror = () => {
+                // On failure, the flag remains false. Resolve with the fallback image.
+                resolve(this.useFallbackSvg(Renderer.FALLBACK_SVG));
+            };
         });
+        
+        // Trigger the image load.
         img.src = src;
-
+    
         const loadedImage = await wait;
+        
+        // Attempt to decode the image for smoother rendering.
         if (typeof (loadedImage as any).decode === "function") {
             try { await loadedImage.decode(); } catch { /* ignore */ }
         }
-
-        this.imageCache.set(src, loadedImage);
-        this.evictOldestIfNeeded();
-
+    
+        // --- THE KEY CHANGE ---
+        // Only add the image to the cache if it was loaded successfully.
+        if (isLoadSuccessful) {
+            this.imageCache.set(src, loadedImage);
+            this.evictOldestIfNeeded();
+        }
+    
         return loadedImage;
     }
 

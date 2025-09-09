@@ -78,8 +78,8 @@ export class Visual implements IVisual {
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
         this.progressIndicator = this.rootElement.append("div").classed("progress-indicator", true);
         this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
-        this.currentImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 1").classed("active", true);
-        this.nextImageElement = this.imageContainer.append("img").attr("alt", "Image Frame 2").classed("standby", true);
+        this.currentImageElement = this.imageContainer.append("img").attr("alt", "Image").classed("active", true);
+        this.nextImageElement = this.imageContainer.append("img").attr("alt", "Image2").classed("standby", true);
         this.imageFrames = [];
         this.tooltipServiceWrapper = createTooltipServiceWrapper(
             options.host.tooltipService,
@@ -115,13 +115,12 @@ export class Visual implements IVisual {
         }        
 
         // --- Centralized UI State Logic ---
+        this.rootElement.classed("is-invalid", !this.isDataValid);
         if (this.isDataValid) {
             this.moveLabelContainer(this.visualSettings.captionCard.position.value.value as "top" | "bottom");
             this.moveProgressIndicator(this.visualSettings.navigationCard.position.value.value as "top" | "bottom");
             this.updateStyling(this.visualSettings);
-        } else {
-            this.defaultStyling()
-        }
+        } 
 
         this.renderer.render(this.imageFrames, this.visualSettings);
 
@@ -410,9 +409,10 @@ export class Visual implements IVisual {
         const alignment = general.imageAlignment.value.value as string;
         this.imageContainer.style("--alignment", alignment);
         //this.imageContainer.selectAll("img").style("object-fit", alignment);
-        this.progressIndicator.style("display", navigation.show.value ? "flex" : "none");
+        //this.progressIndicator.style("display", navigation.show.value ? "flex" : "none");
+        this.progressIndicator.classed("hidden", !navigation.show.value);
         //this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
-        this.controlsWrapper.select(".panel-indicator").style("display", "flex");
+        //this.controlsWrapper.select(".panel-indicator").style("display", "flex");
         this.captionContainer
             .style("display", caption.show.value ? "block" : "none")
             .style("font-family", caption.font.fontFamily.value)
@@ -426,7 +426,7 @@ export class Visual implements IVisual {
         const navigation = settings.navigationCard;
         navigation.activeDotColor.value.value = this.isHighContrast
             ? this.colorPalette.foregroundSelected.value
-            : navigation.activeDotColor.value.value || this.colorPalette.hyperlink.value;
+            : navigation.activeDotColor.value.value || this.colorPalette.getColor("activeDot").value;
         const dotColor = this.isHighContrast
             ? this.colorPalette.background.value
             : this.colorPalette.foregroundButton.value;
@@ -438,18 +438,5 @@ export class Visual implements IVisual {
         this.rootElement.style("--hovered-dot-color", hoveredDotColor);
         this.rootElement.style("--hovered-dot-border-color", this.colorPalette.foregroundSelected.value);
         this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
-    }
-
-    private defaultStyling() {
-        this.progressIndicator.style("display", "none");
-        this.controlsWrapper.select(".panel-indicator").style("display", "none");
-        this.controlsWrapper.classed("is-expanded", false);
-        this.captionContainer
-            .style("display", "block")
-            .style("font-family", "Segoe UI")          // fontFamily default
-            .style("font-size", `12pt`)                // fontSize default
-            .style("font-weight", "normal")            // bold default is false
-            .style("font-style", "normal")             // italic default is false
-            .style("color", "#333333");                // caption color default
     }
 }

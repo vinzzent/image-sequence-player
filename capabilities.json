@@ -22,7 +22,8 @@
     }
   ],
   "dataViewMappings": [
-  {"conditions": [
+    {
+      "conditions": [
         {
           "category": {
             "max": 1
@@ -35,35 +36,39 @@
           }
         }
       ],
-    "categorical": {
-      "categories": {
-        "for": {
-          "in": "category"
-        },
-        "dataReductionAlgorithm": { "top": { "count": 3500 } }
-      },
-      "values": {
-        "select": [
-          {
-            "bind": {
-              "to": "imageUri"
-            }
+      "categorical": {
+        "categories": {
+          "for": {
+            "in": "category"
           },
-          {
-            "bind": {
-              "to": "value"
-            }
-          },
-          {
-            "bind": {
-              "to": "tooltips"
+          "dataReductionAlgorithm": {
+            "top": {
+              "count": 3500
             }
           }
-        ]
+        },
+        "values": {
+          "select": [
+            {
+              "bind": {
+                "to": "imageUri"
+              }
+            },
+            {
+              "bind": {
+                "to": "value"
+              }
+            },
+            {
+              "bind": {
+                "to": "tooltips"
+              }
+            }
+          ]
+        }
       }
     }
-  }
-],
+  ],
   "sorting": {
     "default": {}
   },
@@ -117,7 +122,7 @@
           "displayName": "Show Caption",
           "type": {
             "bool": true
-          }        
+          }
         },
         "position": {
           "displayName": "Position",
@@ -168,7 +173,7 @@
           "type": {
             "bool": true
           }
-        }        
+        }
       }
     },
     "navigation": {
@@ -195,16 +200,16 @@
               }
             }
           }
-        }        
+        }
       }
     },
     "general": {
       "displayName": "General Settings",
-      "properties": {        
+      "properties": {
         "imageAlignment": {
           "displayName": "Image Alignment",
           "type": {
-            "enumeration": []            
+            "enumeration": []
           }
         },
         "backgroundColor": {
@@ -231,5 +236,13 @@
       "tooltips"
     ]
   },
-  "privileges": []
+  "privileges": [
+    {
+      "name": "WebAccess",
+      "essential": true,
+      "parameters": [
+        "*"
+      ]
+    }
+  ]
 }

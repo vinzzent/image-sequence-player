@@ -146,7 +146,7 @@ class NavigationSettingsCard extends FormattingSettingsSimpleCard {
     activeDotColor = new formattingSettings.ColorPicker({
         name: "activeDotColor",
         displayName: "Color",
-        value: { value: "#118DFF" }
+        value: { value: "" }
     });
 
     topLevelSlice: formattingSettings.ToggleSwitch = this.show;
@@ -165,9 +165,9 @@ class GeneralSettingsCard extends FormattingSettingsSimpleCard {
     });
 
     backgroundColor = new formattingSettings.ColorPicker({
-        name: "backgroundColor",
+        name: "backgroundColor",       
         displayName: "Background Color",
-        value: { value: "#FFFFFF" }
+        value: { value: "" }
     });
 
     slices: FormattingSettingsSlice[] = [this.imageAlignment, this.backgroundColor];

@@ -42,6 +42,7 @@ export class Renderer {
     private controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     private progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     private playPauseButton: d3.Selection<HTMLButtonElement, any, any, any>;
+    private spinnerElement: d3.Selection<HTMLDivElement, any, any, any>;
     private currentIndex: number = 0;
     private oldIndex: number = -1;
     private isPlaying: boolean = false;
@@ -49,9 +50,10 @@ export class Renderer {
     private playbackTimer: number;
     private isTransitioning: boolean = false;
     private isFallbackImage: boolean = false;
+    private isInitialLoading: boolean = false; // Tracks if spinner is active    
     // --- Lightweight image cache for smooth next-frame transitions ---
     private imageCache: Map<string, HTMLImageElement> = new Map();
-    private readonly maxCacheEntries: number = 8;
+    private readonly maxCacheEntries: number = 10;
 
     private static readonly FALLBACK_SVG: string = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
                                                     <g opacity="0.5">
@@ -59,6 +61,37 @@ export class Renderer {
                                                         <path d="M15.4 6.9a1.5 1.5 0 1 1-1.5-1.5 1.5 1.5 0 0 1 1.5 1.5ZM1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z"/>
                                                         <path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z"/>
                                                     </g></svg>`;
+
+    private static readonly SPINNER_SVG: SVGSVGElement = (() => {
+        const svgNS = "http://www.w3.org/2000/svg";
+
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", "50");
+        svg.setAttribute("height", "50");
+        svg.setAttribute("viewBox", "0 0 50 50");
+
+        const circle = document.createElementNS(svgNS, "circle");
+        circle.setAttribute("cx", "25");
+        circle.setAttribute("cy", "25");
+        circle.setAttribute("r", "20");
+        circle.setAttribute("stroke", "#999");
+        circle.setAttribute("stroke-width", "7");
+        circle.setAttribute("fill", "none");
+        circle.setAttribute("stroke-linecap", "round");
+        circle.setAttribute("stroke-dasharray", "94.2 31.4");
+
+        const animate = document.createElementNS(svgNS, "animateTransform");
+        animate.setAttribute("attributeName", "transform");
+        animate.setAttribute("type", "rotate");
+        animate.setAttribute("from", "0 25 25");
+        animate.setAttribute("to", "360 25 25");
+        animate.setAttribute("dur", "1s");
+        animate.setAttribute("repeatCount", "indefinite");
+        circle.appendChild(animate);
+        svg.appendChild(circle);
+
+        return svg;
+    })();
 
     private static readonly ICONS: { [key: string]: IconData } = {
         play: { viewBox: "0 0 24 24", path: "M8 5v14l11-7z" },
@@ -83,8 +116,8 @@ export class Renderer {
         this.visualSettings = {} as VisualFormattingSettingsModel;
         this.tooltipServiceWrapper = options.tooltipServiceWrapper;
 
+        this.initSpinner();
         this.setupControls();
-
     }
 
     public render(imageFrames: ImageFrame[], visualSettings: VisualFormattingSettingsModel) {
@@ -93,13 +126,36 @@ export class Renderer {
         this.currentIndex = 0;
         this.oldIndex = -1;
         this.renderFrame(this.currentIndex, this.oldIndex);
+        if (imageFrames.length === 0) return;
+
+        const firstFrame = imageFrames[this.currentIndex];
+
+        if (!this.isInitialLoading) {
+            this.currentImageElement.style("display", "none");
+            this.spinnerElement.style("display", "block");
+            this.isInitialLoading = true;
+        }
+
+        // Load the first image (will use cache if available)
+        this.loadAndDecode(firstFrame.imageUri).then(decodedImg => {
+            if (this.isInitialLoading) {
+                this.spinnerElement.style("display", "none");
+                this.currentImageElement.style("display", "block");
+                this.isInitialLoading = false;
+            }
+
+            if (!decodedImg) return;
+
+            // Render the first frame
+            this.renderFrame(this.currentIndex, this.oldIndex);
+        });
     }
 
     private renderFrame(currentIndex: number, oldIndex: number, isSteppingForward: boolean = true) {
         if (!this.imageFrames || !this.imageFrames[currentIndex] || this.isTransitioning) {
             return;
         }
-        
+
         this.isFallbackImage = false;
 
         const frames = this.imageFrames;
@@ -109,7 +165,7 @@ export class Renderer {
 
         this.loadAndDecode(frame.imageUri).then((decodedImg) => {
             console.log("Image loaded:", frame.imageUri);
-            if (this.currentIndex !== currentIndex || !decodedImg) {                
+            if (this.currentIndex !== currentIndex || !decodedImg) {
                 return; // Abort if state changed while image was loading (race condition)
             }
 
@@ -161,6 +217,16 @@ export class Renderer {
             () => frames[currentIndex].tooltips,
             () => frames[currentIndex].identity
         );
+    }
+
+    private initSpinner() {
+        if (!this.spinnerElement) {
+            this.spinnerElement = this.imageContainer.append("div")
+                .classed("spinner", true); // styles handled in CSS
+
+            // Append static SVG once
+            this.spinnerElement.node()?.appendChild(Renderer.SPINNER_SVG);
+        }
     }
 
     private useFallbackSvg(svgString: string): HTMLImageElement {

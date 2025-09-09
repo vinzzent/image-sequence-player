@@ -17,6 +17,7 @@ import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.visuals.ISelectionId;
 import DataView = powerbi.DataView;
+import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
 
 import "./../style/visual.less";
 
@@ -40,8 +41,10 @@ interface Formatters {
 export class Visual implements IVisual {
     private host: IVisualHost;
     private events: IVisualEventService;
+    private colorPalette: ISandboxExtendedColorPalette;
+    private isHighContrast: boolean;
     private selectionManager: ISelectionManager;
-    private target: HTMLElement;    
+    private target: HTMLElement;
     private imageFrames: ImageFrame[];
     private formattingSettingsService: FormattingSettingsService;
     private visualSettings: VisualFormattingSettingsModel;
@@ -57,16 +60,19 @@ export class Visual implements IVisual {
     private renderer: Renderer;
     private formatters: Formatters;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
-    private static readonly INVALID_MESSAGE: string = "Please add data to 'Category' and 'Image' fields.";
-    private static readonly BLOCK_EXTERNAL_URLS: boolean = true;
+    private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n and \n [Image] \n fields.";
+    private static readonly BLOCK_EXTERNAL_URLS: boolean = false;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
         this.events = options.host.eventService;
+        this.colorPalette = options.host.colorPalette;
+        this.isHighContrast = options.host.colorPalette.isHighContrast;
         this.selectionManager = this.host.createSelectionManager();
         this.target = options.element;
-        this.formattingSettingsService = new FormattingSettingsService();       
+        this.formattingSettingsService = new FormattingSettingsService();
         this.rootElement = d3Select(this.target).append("div").classed("image-sequence-player", true);
+        this.rootElement.classed("highcontrast", this.isHighContrast);
         this.contentContainer = this.rootElement.append("div").classed("content-container", true);
         this.captionContainer = this.contentContainer.append("div").classed("caption-container", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
@@ -106,7 +112,7 @@ export class Visual implements IVisual {
             this.imageFrames = this.transformDataViewToFrames(dataView);
         } else {
             this.imageFrames = this.createAwaitingDataFrames();
-        }
+        }        
 
         // --- Centralized UI State Logic ---
         if (this.isDataValid) {
@@ -128,15 +134,16 @@ export class Visual implements IVisual {
 
     private static createPlaceholderSvg(message: string): string {
         const textStyle = `font-family: 'Segoe UI', sans-serif; font-size: 14px; fill: #666666;`;
-        const textLines = message.split("'").map((line, index) =>
-            `<tspan x="50%" dy="${index === 0 ? '-0.5em' : '1.2em'}">'${line}'</tspan>`
+
+        const textLines = message.split("\n").map((line, index) =>
+            `<tspan x="50%" dy="${index === 0 ? '-0.5em' : '1.2em'}">${line}</tspan>`
         ).join("");
 
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                        <text x="50%" y="50%" text-anchor="middle" style="${textStyle}">
-                            ${textLines}
-                        </text>
-                     </svg>`;
+                    <text x="50%" y="50%" text-anchor="middle" style="${textStyle}">
+                        ${textLines}
+                    </text>
+                 </svg>`;
 
         return `data:image/svg+xml,${encodeURIComponent(svg)}`;
     }
@@ -157,114 +164,114 @@ export class Visual implements IVisual {
         return true; // If all checks pass, the data is valid
     }
 
-   /**
- * Transforms the dataView into an array of ImageFrame objects.
- * Each frame represents an image with its associated data.
- * The caption and tooltip for each frame are dynamically determined based on the visual's format settings.
- *
- * @param dataView The DataView object provided by Power BI.
- * @returns An array of ImageFrame objects.
- */
-private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
-    const categorical = dataView.categorical;
-    console.log(categorical);
-    const categories = categorical.categories.find(c => c.source.roles?.["category"]);
-    const categoryFormat = categories?.source?.format;
+    /**
+  * Transforms the dataView into an array of ImageFrame objects.
+  * Each frame represents an image with its associated data.
+  * The caption and tooltip for each frame are dynamically determined based on the visual's format settings.
+  *
+  * @param dataView The DataView object provided by Power BI.
+  * @returns An array of ImageFrame objects.
+  */
+    private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
+        const categorical = dataView.categorical;
+        console.log(categorical);
+        const categories = categorical.categories.find(c => c.source.roles?.["category"]);
+        const categoryFormat = categories?.source?.format;
 
-    const valuesData = categorical.values.find(v => v.source.roles?.["value"]);
-    const valueFormat = valuesData?.source?.format;
+        const valuesData = categorical.values.find(v => v.source.roles?.["value"]);
+        const valueFormat = valuesData?.source?.format;
 
-    const tooltipData = categorical.values.filter(v => v.source.roles?.["tooltips"]);
-    const tooltipFormats = tooltipData?.map(v => v.source?.format) || [];
+        const tooltipData = categorical.values.filter(v => v.source.roles?.["tooltips"]);
+        const tooltipFormats = tooltipData?.map(v => v.source?.format) || [];
 
-    const imageData = categorical.values.find(v => v.source.roles?.["imageUri"]);
+        const imageData = categorical.values.find(v => v.source.roles?.["imageUri"]);
 
-    this.formatters = {
-        forCategory: categories ? valueFormatter.create({ format: categoryFormat }) : undefined,
-        forValue: valuesData ? valueFormatter.create({ format: valueFormat }) : undefined,
-        forTooltips: tooltipFormats.map(f => valueFormatter.create({ format: f }))
-    };
-
-    if (!categories?.values || !imageData?.values) {
-        return [];
-    }
-
-    const imageHighlights = imageData?.highlights;
-    const isAnyHighlightActive = imageHighlights !== undefined;
-
-    const frames: ImageFrame[] = [];
-    const captionsEnabled = this.visualSettings.captionCard.show.value;
-    const captionType = this.visualSettings.captionCard.type.value.value as string;
-
-    for (let i = 0; i < categories.values.length; i++) {
-        const identity = this.host.createSelectionIdBuilder()
-            .withCategory(categories, i)
-            .createSelectionId();
-
-        // --- Only image highlight logic ---
-        let opacity = 1.0; 
-        if (isAnyHighlightActive) {
-            const highlightVal = imageHighlights ? imageHighlights[i] : null;
-            if (highlightVal === null || highlightVal === "") {
-                opacity = 0.2; // Dimmed when not highlighted
-            }
-        }
-
-        let captionText = '';
-        const tooltipItems: VisualTooltipDataItem[] = [];
-
-        const categoryRaw = categories.values[i];
-        const formattedCategory = this.formatters.forCategory
-            ? this.formatters.forCategory.format(categoryRaw)
-            : String(categoryRaw);
-        tooltipItems.push({ displayName: categories.source.displayName, value: formattedCategory });
-
-        let formattedValue = '';
-        if (valuesData) {
-            const valueRaw = valuesData.values[i];
-            formattedValue = this.formatters.forValue && valueRaw !== undefined
-                ? this.formatters.forValue.format(valueRaw)
-                : valueRaw !== undefined ? String(valueRaw) : '';
-            tooltipItems.push({ displayName: valuesData.source.displayName, value: formattedValue });
-        }
-
-        tooltipData.forEach((measure, index) => {
-            const measureValue = measure.values[i];
-            if (measureValue !== undefined) {
-                const formattedMeasure = this.formatters.forTooltips[index].format(measureValue);
-                tooltipItems.push({ displayName: measure.source.displayName, value: formattedMeasure });
-            }
-        });
-
-        if (captionsEnabled) {
-            switch (captionType) {
-                case "value": captionText = formattedValue; break;
-                case "category_value": captionText = formattedValue ? `${formattedCategory}: ${formattedValue}` : formattedCategory; break;
-                case "category": default: captionText = formattedCategory; break;
-            }
-        }
-
-        const frame: ImageFrame = {
-            identity,
-            imageUri: this.uriSanitizer(imageData.values[i] as string),
-            caption: captionText,
-            tooltips: tooltipItems,
-            opacity: opacity
+        this.formatters = {
+            forCategory: categories ? valueFormatter.create({ format: categoryFormat }) : undefined,
+            forValue: valuesData ? valueFormatter.create({ format: valueFormat }) : undefined,
+            forTooltips: tooltipFormats.map(f => valueFormatter.create({ format: f }))
         };
-        frames.push(frame);
+
+        if (!categories?.values || !imageData?.values) {
+            return [];
+        }
+
+        const imageHighlights = imageData?.highlights;
+        const isAnyHighlightActive = imageHighlights !== undefined;
+
+        const frames: ImageFrame[] = [];
+        const captionsEnabled = this.visualSettings.captionCard.show.value;
+        const captionType = this.visualSettings.captionCard.type.value.value as string;
+
+        for (let i = 0; i < categories.values.length; i++) {
+            const identity = this.host.createSelectionIdBuilder()
+                .withCategory(categories, i)
+                .createSelectionId();
+
+            // --- Only image highlight logic ---
+            let opacity = 1.0;
+            if (isAnyHighlightActive) {
+                const highlightVal = imageHighlights ? imageHighlights[i] : null;
+                if (highlightVal === null || highlightVal === "") {
+                    opacity = 0.2; // Dimmed when not highlighted
+                }
+            }
+
+            let captionText = '';
+            const tooltipItems: VisualTooltipDataItem[] = [];
+
+            const categoryRaw = categories.values[i];
+            const formattedCategory = this.formatters.forCategory
+                ? this.formatters.forCategory.format(categoryRaw)
+                : String(categoryRaw);
+            tooltipItems.push({ displayName: categories.source.displayName, value: formattedCategory });
+
+            let formattedValue = '';
+            if (valuesData) {
+                const valueRaw = valuesData.values[i];
+                formattedValue = this.formatters.forValue && valueRaw !== undefined
+                    ? this.formatters.forValue.format(valueRaw)
+                    : valueRaw !== undefined ? String(valueRaw) : '';
+                tooltipItems.push({ displayName: valuesData.source.displayName, value: formattedValue });
+            }
+
+            tooltipData.forEach((measure, index) => {
+                const measureValue = measure.values[i];
+                if (measureValue !== undefined) {
+                    const formattedMeasure = this.formatters.forTooltips[index].format(measureValue);
+                    tooltipItems.push({ displayName: measure.source.displayName, value: formattedMeasure });
+                }
+            });
+
+            if (captionsEnabled) {
+                switch (captionType) {
+                    case "value": captionText = formattedValue; break;
+                    case "category_value": captionText = formattedValue ? `${formattedCategory}: ${formattedValue}` : formattedCategory; break;
+                    case "category": default: captionText = formattedCategory; break;
+                }
+            }
+
+            const frame: ImageFrame = {
+                identity,
+                imageUri: this.uriSanitizer(imageData.values[i] as string),
+                caption: captionText,
+                tooltips: tooltipItems,
+                opacity: opacity
+            };
+            frames.push(frame);
+        }
+        return frames;
     }
-    return frames;
-}
 
 
-/**
-     * Sanitizes a URI based on the static `BLOCK_EXTERNAL_URLS` policy.
-     * If the policy is true, it strictly allows only data URIs.
-     * If the policy is false, it validates and allows `http` or `httpsa` URLs.
-     *
-     * @param src The raw image source string.
-     * @returns A sanitized URI string or null if the input is invalid or blocked by policy.
-     */
+    /**
+         * Sanitizes a URI based on the static `BLOCK_EXTERNAL_URLS` policy.
+         * If the policy is true, it strictly allows only data URIs.
+         * If the policy is false, it validates and allows `http` or `httpsa` URLs.
+         *
+         * @param src The raw image source string.
+         * @returns A sanitized URI string or null if the input is invalid or blocked by policy.
+         */
     private uriSanitizer(src: string): string | null {
         if (!src || typeof src !== 'string') {
             return null;
@@ -292,7 +299,8 @@ private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
 
                 // **Sanitization**: Explicitly allow only 'http:' and 'https:' protocols
                 // to prevent security risks from protocols like 'javascript:' or 'file:'.
-                if (url.protocol === 'http:' || url.protocol === 'https:') {
+                //if (url.protocol === 'http:' || url.protocol === 'https:') {
+                if (url.protocol === 'https:') {
                     return url.href; // Return the normalized, valid URL.
                 }
 
@@ -389,15 +397,21 @@ private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
         const general = settings.generalCard;
         const navigation = settings.navigationCard;
         const caption = settings.captionCard;
+        general.backgroundColor.value.value = general.backgroundColor.value.value || this.colorPalette.background.value;
+        //navigation.activeDotColor.value.value = navigation.activeDotColor.value.value || this.colorPalette.hyperlink.value;
 
         this.rootElement
-            .style("background-color", general.backgroundColor.value.value)
+            //.style("background-color", general.backgroundColor.value.value)            
+            .style("background-color", general.backgroundColor.value.value) // Use host background color for better theme integration
         //.classed("label-above", caption.position.value.value === 'above');
 
+        this.settingColors(settings);
+
         const alignment = general.imageAlignment.value.value as string;
-        this.imageContainer.selectAll("img").style("object-fit", alignment);
+        this.imageContainer.style("--alignment", alignment);
+        //this.imageContainer.selectAll("img").style("object-fit", alignment);
         this.progressIndicator.style("display", navigation.show.value ? "flex" : "none");
-        this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
+        //this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
         this.controlsWrapper.select(".panel-indicator").style("display", "flex");
         this.captionContainer
             .style("display", caption.show.value ? "block" : "none")
@@ -406,6 +420,24 @@ private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
             .style("font-weight", caption.font.bold.value ? "bold" : "normal")
             .style("font-style", caption.font.italic.value ? "italic" : "normal")
             .style("color", caption.color.value.value);
+    }
+
+    private settingColors(settings: VisualFormattingSettingsModel) {
+        const navigation = settings.navigationCard;
+        navigation.activeDotColor.value.value = this.isHighContrast
+            ? this.colorPalette.foregroundSelected.value
+            : navigation.activeDotColor.value.value || this.colorPalette.hyperlink.value;
+        const dotColor = this.isHighContrast
+            ? this.colorPalette.background.value
+            : this.colorPalette.foregroundButton.value;
+        const hoveredDotColor = this.isHighContrast
+            ? this.colorPalette.background.value
+            : this.colorPalette.foregroundSelected.value;
+        this.rootElement.style("--dot-color", dotColor);
+        this.rootElement.style("--dot-border-color", this.colorPalette.foreground.value);        
+        this.rootElement.style("--hovered-dot-color", hoveredDotColor);
+        this.rootElement.style("--hovered-dot-border-color", this.colorPalette.foregroundSelected.value);
+        this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
     }
 
     private defaultStyling() {

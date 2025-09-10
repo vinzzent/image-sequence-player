@@ -40,6 +40,8 @@ export class Renderer {
     private nextImageElement: d3.Selection<HTMLImageElement, any, any, any>;
     private captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
+    private controlsPanel: d3.Selection<HTMLDivElement, any, any, any>;
+    private controlButtons: d3.Selection<HTMLDivElement, any, any, any>;
     private progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     private playPauseButton: d3.Selection<HTMLButtonElement, any, any, any>;
     private spinnerElement: d3.Selection<HTMLDivElement, any, any, any>;
@@ -115,6 +117,9 @@ export class Renderer {
         this.imageFrames = [];
         this.visualSettings = {} as VisualFormattingSettingsModel;
         this.tooltipServiceWrapper = options.tooltipServiceWrapper;
+
+        this.controlsPanel = this.controlsWrapper.append("div").classed("controls-panel", true);
+        this.controlButtons = this.controlsPanel.append("div").classed("control-buttons", true);
 
         this.initSpinner();
         this.setupControls();
@@ -308,24 +313,51 @@ export class Renderer {
         if (this.isTransitioning) return;
         this.isTransitioning = true;
 
+        // --- CLONE-ON-REUSE STRATEGY ---
+        // 1. Why clone? If the incoming image from the cache is the same as the one
+        //    currently displayed, reusing the same HTMLImageElement DOM node can cause
+        //    browsers to skip the CSS animation, resulting in a flicker or no transition.
+        // 2. How it works: We check if the cached element is already an active DOM node.
+        //    If it is, we create a lightweight clone using cloneNode(true). This clone
+        //    points to the same decoded image data in memory (no re-download or re-decode),
+        //    but as a new DOM node, it guarantees that CSS animations will trigger reliably.
+        let imageForTransition = newImageElement;
+        if (newImageElement === this.currentImageElement.node() || newImageElement === this.nextImageElement.node()) {
+            imageForTransition = newImageElement.cloneNode(true) as HTMLImageElement;
+        }
+
+        // Replace the standby element with the new (potentially cloned) image element.
         const standbyNode = this.nextImageElement.node();
         if (standbyNode?.parentNode) {
-            standbyNode.parentNode.replaceChild(newImageElement, standbyNode);
+            standbyNode.parentNode.replaceChild(imageForTransition, standbyNode);
         } else {
-            this.imageContainer.node().appendChild(newImageElement);
+            // Fallback if the standby node isn't attached for some reason.
+            this.imageContainer.node().appendChild(imageForTransition);
         }
-        this.nextImageElement = d3Select(newImageElement);
 
+        // 3. Reference Management: The `nextImageElement` d3 selection is now updated to
+        //    point to the new DOM node that was just inserted. After the animation, the
+        //    cleanup function will swap `currentImageElement` and `nextImageElement`,
+        //    making the newly shown image the "current" one for the next cycle.
+        this.nextImageElement = d3Select(imageForTransition);
+
+        // --- NO DURATION ---
+        // If there's no transition duration, immediately swap the classes and references.
         if (duration === 0) {
             this.currentImageElement.attr("class", "standby");
             this.nextImageElement.attr("class", "active");
+
+            // Swap the d3 references for the next cycle.
             const temp = this.currentImageElement;
             this.currentImageElement = this.nextImageElement;
             this.nextImageElement = temp;
+
             this.isTransitioning = false;
             return;
         }
 
+        // --- ANIMATION LOGIC (UNCHANGED) ---
+        // This section remains the same, applying animations to the D3 selections.
         let currentAnimation: string, nextAnimation: string;
         const direction = forward ? 'fwd' : 'rev';
 
@@ -345,15 +377,20 @@ export class Renderer {
                 break;
         }
 
-        const nextNode = this.nextImageElement.node();
+        // --- CLEANUP LOGIC (UNCHANGED) ---
+        // This sets up the animationend listener and a safety timeout to ensure
+        // the state is cleaned up correctly after the animation.
+        const nextNodeForCleanup = this.nextImageElement.node();
         const cleanup = () => {
-            nextNode.removeEventListener('animationend', cleanup);
+            nextNodeForCleanup.removeEventListener('animationend', cleanup);
             clearTimeout(safetyTimeout);
 
+            // Swap the D3 selection references to prepare for the next transition.
             const oldCurrent = this.currentImageElement;
             this.currentImageElement = this.nextImageElement;
             this.nextImageElement = oldCurrent;
 
+            // Reset styles and classes. The new current image is 'active', the old one becomes 'standby'.
             this.currentImageElement.style("animation", null).attr("class", "active");
             this.nextImageElement.style("animation", null).attr("class", "standby");
 
@@ -363,7 +400,7 @@ export class Renderer {
         this.currentImageElement.attr("class", "current");
         this.nextImageElement.attr("class", "next");
 
-        nextNode.addEventListener('animationend', cleanup, { once: true });
+        nextNodeForCleanup.addEventListener('animationend', cleanup, { once: true });
 
         const durationMs = `${duration}ms`;
         const fillMode = 'forwards';
@@ -423,15 +460,12 @@ export class Renderer {
                 this.controlsWrapper.classed("is-expanded", !isExpanded);
             });
 
-        const panel = this.controlsWrapper.append("div").classed("controls-panel", true);
-        const buttons = panel.append("div").classed("control-buttons", true);
-
-        this.createIconButton(buttons, Renderer.ICONS.goToStart).on("click", () => this.goToFrame(0));
-        this.createIconButton(buttons, Renderer.ICONS.stepBack).on("click", () => this.step(-1));
-        this.playPauseButton = this.createIconButton(buttons, Renderer.ICONS.play).on("click", () => this.togglePlayback());
-        this.createIconButton(buttons, Renderer.ICONS.stepForward).on("click", () => this.step(1));
-        this.createIconButton(buttons, Renderer.ICONS.goToEnd).on("click", () => this.goToFrame(this.imageFrames.length - 1));
-        this.createIconButton(buttons, Renderer.ICONS.loop)
+        this.createIconButton(this.controlButtons, Renderer.ICONS.goToStart).on("click", () => this.goToFrame(0));
+        this.createIconButton(this.controlButtons, Renderer.ICONS.stepBack).on("click", () => this.step(-1));
+        this.playPauseButton = this.createIconButton(this.controlButtons, Renderer.ICONS.play).on("click", () => this.togglePlayback());
+        this.createIconButton(this.controlButtons, Renderer.ICONS.stepForward).on("click", () => this.step(1));
+        this.createIconButton(this.controlButtons, Renderer.ICONS.goToEnd).on("click", () => this.goToFrame(this.imageFrames.length - 1));
+        this.createIconButton(this.controlButtons, Renderer.ICONS.loop)
             .classed("loop-toggle", true)
             .on("click", (event) => {
                 this.isLooping = !this.isLooping;

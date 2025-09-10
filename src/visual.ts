@@ -112,7 +112,7 @@ export class Visual implements IVisual {
             this.imageFrames = this.transformDataViewToFrames(dataView);
         } else {
             this.imageFrames = this.createAwaitingDataFrames();
-        }        
+        }
 
         // --- Centralized UI State Logic ---
         this.rootElement.classed("is-invalid", !this.isDataValid);
@@ -120,7 +120,7 @@ export class Visual implements IVisual {
             this.moveLabelContainer(this.visualSettings.captionCard.position.value.value as "top" | "bottom");
             this.moveProgressIndicator(this.visualSettings.navigationCard.position.value.value as "top" | "bottom");
             this.updateStyling(this.visualSettings);
-        } 
+        }
 
         this.renderer.render(this.imageFrames, this.visualSettings);
 
@@ -212,7 +212,7 @@ export class Visual implements IVisual {
             if (isAnyHighlightActive) {
                 const highlightVal = imageHighlights ? imageHighlights[i] : null;
                 if (highlightVal === null || highlightVal === "") {
-                    opacity = 0.2; // Dimmed when not highlighted
+                    opacity = 0.4; // Dimmed when not highlighted
                 }
             }
 
@@ -370,7 +370,7 @@ export class Visual implements IVisual {
 
     /**
  * Move the caption container relative to the image container
- * @param position "above" | "below"
+ * @param position "top" | "bottom"
  */
     private moveLabelContainer(position: "top" | "bottom") {
         if (position === "top") {
@@ -382,7 +382,7 @@ export class Visual implements IVisual {
 
     /**
      * Move the progress indicator relative to the content container
-     * @param position "above" | "below"
+     * @param position "top" | "bottom"
      */
     private moveProgressIndicator(position: "top" | "bottom") {
         if (position === "top") {
@@ -397,29 +397,21 @@ export class Visual implements IVisual {
         const navigation = settings.navigationCard;
         const caption = settings.captionCard;
         general.backgroundColor.value.value = general.backgroundColor.value.value || this.colorPalette.background.value;
-        //navigation.activeDotColor.value.value = navigation.activeDotColor.value.value || this.colorPalette.hyperlink.value;
 
-        this.rootElement
-            //.style("background-color", general.backgroundColor.value.value)            
-            .style("background-color", general.backgroundColor.value.value) // Use host background color for better theme integration
-        //.classed("label-above", caption.position.value.value === 'above');
+        this.rootElement.style("--visual-background-color", general.backgroundColor.value.value) // Use host background color for better theme integration        
 
         this.settingColors(settings);
 
-        const alignment = general.imageAlignment.value.value as string;
-        this.imageContainer.style("--alignment", alignment);
-        //this.imageContainer.selectAll("img").style("object-fit", alignment);
-        //this.progressIndicator.style("display", navigation.show.value ? "flex" : "none");
+        this.imageContainer.style("--alignment", general.imageAlignment.value.value as string);
         this.progressIndicator.classed("hidden", !navigation.show.value);
-        //this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
-        //this.controlsWrapper.select(".panel-indicator").style("display", "flex");
+
         this.captionContainer
-            .style("display", caption.show.value ? "block" : "none")
-            .style("font-family", caption.font.fontFamily.value)
-            .style("font-size", `${caption.font.fontSize.value}pt`)
-            .style("font-weight", caption.font.bold.value ? "bold" : "normal")
-            .style("font-style", caption.font.italic.value ? "italic" : "normal")
-            .style("color", caption.color.value.value);
+            .classed("hidden", !caption.show.value)
+            .classed("is-bold", caption.font.bold.value)
+            .classed("is-italic", caption.font.italic.value)
+            .style("--caption-font-family", caption.font.fontFamily.value)
+            .style("--caption-font-size", `${caption.font.fontSize.value}pt`)
+            .style("--caption-color", caption.color.value.value);
     }
 
     private settingColors(settings: VisualFormattingSettingsModel) {
@@ -432,11 +424,28 @@ export class Visual implements IVisual {
             : this.colorPalette.foregroundButton.value;
         const hoveredDotColor = this.isHighContrast
             ? this.colorPalette.background.value
-            : this.colorPalette.foregroundSelected.value;
-        this.rootElement.style("--dot-color", dotColor);
-        this.rootElement.style("--dot-border-color", this.colorPalette.foreground.value);        
-        this.rootElement.style("--hovered-dot-color", hoveredDotColor);
-        this.rootElement.style("--hovered-dot-border-color", this.colorPalette.foregroundSelected.value);
-        this.rootElement.style("--active-dot-color", navigation.activeDotColor.value.value);
+            : this.colorPalette.foregroundSelected.value;        
+        this.progressIndicator.style("--dot-color", dotColor);
+        this.progressIndicator.style("--dot-border-color", this.colorPalette.foreground.value);
+        this.progressIndicator.style("--hovered-dot-color", hoveredDotColor);
+        this.progressIndicator.style("--hovered-dot-border-color", this.colorPalette.foregroundSelected.value);
+        this.progressIndicator.style("--active-dot-color", navigation.activeDotColor.value.value);
+
+        const scrollbarColor = this.isHighContrast
+            ? this.colorPalette.background.value
+            : this.colorPalette.foregroundButton.value;
+        
+        this.progressIndicator.style("--scrollbar-color", scrollbarColor);
+        this.progressIndicator.style("--scrollbar-border-color", this.colorPalette.foreground.value); 
+
+        const panelIndicatorBorderColor = this.isHighContrast
+            ? this.colorPalette.foreground.value
+            : this.colorPalette.foregroundButton.value;
+        const hoveredPanelIndicatorBorderColor = this.isHighContrast
+            ? this.colorPalette.foregroundSelected.value
+            : this.colorPalette.foreground.value;
+        this.controlsWrapper.style("--panel-indicator-color", this.colorPalette.background.value);
+        this.controlsWrapper.style("--panel-indicator-border-color", panelIndicatorBorderColor);
+        this.controlsWrapper.style("--hovered-panel-indicator-border-color", hoveredPanelIndicatorBorderColor);
     }
 }

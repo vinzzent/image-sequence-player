@@ -45,6 +45,7 @@ export class Renderer {
     private progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     private playPauseButton: d3.Selection<HTMLButtonElement, any, any, any>;
     private spinnerElement: d3.Selection<HTMLDivElement, any, any, any>;
+    private spinnerSvg: d3.Selection<SVGSVGElement, any, any, any>;
     private currentIndex: number = 0;
     private oldIndex: number = -1;
     private isPlaying: boolean = false;
@@ -58,11 +59,21 @@ export class Renderer {
     private readonly maxCacheEntries: number = 10;
 
     private static readonly FALLBACK_SVG: string = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
-                                                    <g opacity="0.5">
+                                                    <g opacity="0.4">
                                                         <path d="m20 20.8.8-.8L.8 0 0 .8Z" style="fill:#d40000"/>
                                                         <path d="M15.4 6.9a1.5 1.5 0 1 1-1.5-1.5 1.5 1.5 0 0 1 1.5 1.5ZM1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z"/>
                                                         <path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z"/>
                                                     </g></svg>`;
+
+    private buildFallbackSvgString(diagonalLineColor: string, backgroundShapesColor: string, imageOpacity: number): string {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
+                    <g opacity="${imageOpacity}">                            
+                        <path d="m20 20.8.8-.8L.8 0 0 .8Z" fill="${diagonalLineColor}"/>                                                                    
+                        <path d="M15.4 6.9a1.5 1.5 0 1 1-1.5-1.5 1.5 1.5 0 0 1 1.5 1.5ZM1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z" fill="${backgroundShapesColor}"/>
+                        <path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z" fill="${backgroundShapesColor}"/>
+                    </g>
+                </svg>`;
+        }
 
     private static readonly SPINNER_SVG: SVGSVGElement = (() => {
         const svgNS = "http://www.w3.org/2000/svg";
@@ -95,6 +106,29 @@ export class Renderer {
         return svg;
     })();
 
+    private setupSpinner() {
+        this.spinnerSvg
+            .attr("width", 50)
+            .attr("height", 50)
+            .attr("viewBox", "0 0 50 50");        
+        const circle = this.spinnerSvg.append("circle")
+            .attr("cx", 25)
+            .attr("cy", 25)
+            .attr("r", 20)
+            .attr("stroke", "#605E5C")
+            .attr("stroke-width", 7)
+            .attr("fill", "none")
+            .attr("stroke-linecap", "round")
+            .attr("stroke-dasharray", "94.2 31.4");      
+        circle.append("animateTransform")
+            .attr("attributeName", "transform")
+            .attr("type", "rotate")
+            .attr("from", "0 25 25")
+            .attr("to", "360 25 25")
+            .attr("dur", "1s")
+            .attr("repeatCount", "indefinite");
+    }    
+
     private static readonly ICONS: { [key: string]: IconData } = {
         play: { viewBox: "0 0 24 24", path: "M8 5v14l11-7z" },
         pause: { viewBox: "0 0 24 24", path: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" },
@@ -120,8 +154,10 @@ export class Renderer {
 
         this.controlsPanel = this.controlsWrapper.append("div").classed("controls-panel", true);
         this.controlButtons = this.controlsPanel.append("div").classed("control-buttons", true);
+        this.spinnerElement = this.imageContainer.append("div").classed("spinner", true);
+        this.spinnerSvg = this.spinnerElement.append("svg");
 
-        this.initSpinner();
+        this.setupSpinner();
         this.setupControls();
     }
 
@@ -235,9 +271,10 @@ export class Renderer {
         }
     }
 
-    private useFallbackSvg(svgString: string): HTMLImageElement {
+    private useFallbackSvg(): HTMLImageElement {
         const fallbackImage = new Image();
-        const encodedSvg = encodeURIComponent(svgString);
+        const svgStr = this.buildFallbackSvgString("#FF0000", "#000000", 0.4); 
+        const encodedSvg = encodeURIComponent(svgStr);
         fallbackImage.src = `data:image/svg+xml,${encodedSvg}`;
         this.isFallbackImage = true;
         return fallbackImage;
@@ -246,7 +283,7 @@ export class Renderer {
     private async loadAndDecode(src: string): Promise<HTMLImageElement> {
         if (!src) {
             // Immediately return fallback for an empty source.
-            return this.useFallbackSvg(Renderer.FALLBACK_SVG);
+            return this.useFallbackSvg();
         }
     
         const cached = this.imageCache.get(src);
@@ -278,7 +315,7 @@ export class Renderer {
             };
             img.onerror = () => {
                 // On failure, the flag remains false. Resolve with the fallback image.
-                resolve(this.useFallbackSvg(Renderer.FALLBACK_SVG));
+                resolve(this.useFallbackSvg());
             };
         });
         

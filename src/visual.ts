@@ -94,12 +94,10 @@ export class Visual implements IVisual {
             currentImageElement: this.currentImageElement,
             nextImageElement: this.nextImageElement,
             tooltipServiceWrapper: this.tooltipServiceWrapper
-        });
-
-        //this.setupControls();
+        });        
     }
 
-    public update(options: VisualUpdateOptions) {
+    public async update(options: VisualUpdateOptions): Promise<void> {
         this.events.renderingStarted(options);
         const dataView = options.dataViews && options.dataViews[0];
         this.visualSettings = this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, dataView);
@@ -122,7 +120,7 @@ export class Visual implements IVisual {
             this.updateStyling(this.visualSettings);
         }
 
-        this.renderer.render(this.imageFrames, this.visualSettings);
+        await this.renderer.render(this.imageFrames, this.visualSettings);
 
         this.events.renderingFinished(options);
     }
@@ -424,7 +422,7 @@ export class Visual implements IVisual {
             : this.colorPalette.foregroundButton.value;
         const hoveredDotColor = this.isHighContrast
             ? this.colorPalette.background.value
-            : this.colorPalette.foregroundSelected.value;        
+            : this.colorPalette.foregroundSelected.value;
         this.progressIndicator.style("--dot-color", dotColor);
         this.progressIndicator.style("--dot-border-color", this.colorPalette.foreground.value);
         this.progressIndicator.style("--hovered-dot-color", hoveredDotColor);
@@ -434,9 +432,9 @@ export class Visual implements IVisual {
         const scrollbarColor = this.isHighContrast
             ? this.colorPalette.background.value
             : this.colorPalette.foregroundButton.value;
-        
+
         this.progressIndicator.style("--scrollbar-color", scrollbarColor);
-        this.progressIndicator.style("--scrollbar-border-color", this.colorPalette.foreground.value); 
+        this.progressIndicator.style("--scrollbar-border-color", this.colorPalette.foreground.value);
 
         const panelIndicatorBorderColor = this.isHighContrast
             ? this.colorPalette.foreground.value

@@ -163,8 +163,9 @@ export class Renderer {
         const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(this.imageFrames);
         dots.enter().append("div").classed("dot", true)
             .on("click", (event, d) => {
-                const i = this.imageFrames.findIndex(f => f.identity.equals(d.identity));
-                if (i !== -1) this.goToFrameFromButton(i);
+                //const i = this.imageFrames.findIndex(f => f.identity.equals(d.identity));
+                //if (i !== -1) this.goToFrameFromButton(i);
+                this.selectFrameById(d.identity);
             })
             .merge(dots)
             .classed("active", (d, i) => i === currentIndex)

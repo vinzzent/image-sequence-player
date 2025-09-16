@@ -51,9 +51,7 @@ export class Visual implements IVisual {
     private rootElement: d3.Selection<HTMLDivElement, any, any, any>;
     private contentContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    private captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    private currentImageElement: d3.Selection<HTMLImageElement, any, any, any>;
-    private nextImageElement: d3.Selection<HTMLImageElement, any, any, any>;
+    private captionContainer: d3.Selection<HTMLDivElement, any, any, any>;    
     private controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     private progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     private isDataValid: boolean = false;
@@ -77,9 +75,7 @@ export class Visual implements IVisual {
         this.captionContainer = this.contentContainer.append("div").classed("caption-container", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
         this.progressIndicator = this.rootElement.append("div").classed("progress-indicator", true);
-        this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
-        this.currentImageElement = this.imageContainer.append("img").attr("alt", "Image").classed("active", true);
-        this.nextImageElement = this.imageContainer.append("img").attr("alt", "Image2").classed("standby", true);
+        this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);        
         this.imageFrames = [];
         this.tooltipServiceWrapper = createTooltipServiceWrapper(
             options.host.tooltipService,
@@ -90,9 +86,7 @@ export class Visual implements IVisual {
             controlsWrapper: this.controlsWrapper,
             progressIndicator: this.progressIndicator,
             imageContainer: this.imageContainer,
-            captionContainer: this.captionContainer,
-            currentImageElement: this.currentImageElement,
-            nextImageElement: this.nextImageElement,
+            captionContainer: this.captionContainer,           
             tooltipServiceWrapper: this.tooltipServiceWrapper
         });        
     }

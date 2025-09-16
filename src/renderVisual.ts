@@ -1,6 +1,9 @@
 import { VisualFormattingSettingsModel } from "./settings";
+import { interpolate as d3Interpolate } from "d3-interpolate";
+import { transition as d3Transition } from "d3-transition";
 import { select as d3Select, Selection } from "d3-selection";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
+import { timeout, Timer } from "d3-timer";
 import ISelectionId = powerbi.visuals.ISelectionId;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
@@ -25,9 +28,15 @@ interface RenderedOptions {
     progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
     captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    currentImageElement: d3.Selection<HTMLImageElement, any, any, any>;
-    nextImageElement: d3.Selection<HTMLImageElement, any, any, any>;
     tooltipServiceWrapper: ITooltipServiceWrapper;
+}
+
+enum PlayerState {
+    Idle,
+    Loading,
+    Playing,
+    Paused,
+    Transitioning
 }
 
 export class Renderer {
@@ -36,8 +45,6 @@ export class Renderer {
     private visualSettings: VisualFormattingSettingsModel;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
     private imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    private currentImageElement: d3.Selection<HTMLImageElement, any, any, any>;
-    private nextImageElement: d3.Selection<HTMLImageElement, any, any, any>;
     private captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     private controlsPanel: d3.Selection<HTMLDivElement, any, any, any>;
@@ -46,17 +53,14 @@ export class Renderer {
     private playPauseButton: d3.Selection<HTMLButtonElement, any, any, any>;
     private spinnerElement: d3.Selection<HTMLDivElement, any, any, any>;
     private spinnerSvg: d3.Selection<SVGSVGElement, any, any, any>;
+
+    private playerState: PlayerState = PlayerState.Idle;
     private currentIndex: number = 0;
-    private oldIndex: number = -1;
-    private isPlaying: boolean = false;
     private isLooping: boolean = false;
-    private playbackTimer: number;
-    private isTransitioning: boolean = false;
-    private isFallbackImage: boolean = false;
-    private isInitialLoading: boolean = false;
+    private playbackTimer: Timer;
+    private isInitialLoad: boolean = true;
     private imageCache: Map<string, HTMLImageElement> = new Map();
     private readonly maxCacheEntries: number = 10;
-    private activeTransitionCleanup?: () => void;
 
     constructor(options: RenderedOptions) {
         this.selectionManager = options.selectionManager;
@@ -64,10 +68,6 @@ export class Renderer {
         this.progressIndicator = options.progressIndicator;
         this.imageContainer = options.imageContainer;
         this.captionContainer = options.captionContainer;
-        this.currentImageElement = options.currentImageElement;
-        this.nextImageElement = options.nextImageElement
-        this.imageFrames = [];
-        this.visualSettings = {} as VisualFormattingSettingsModel;
         this.tooltipServiceWrapper = options.tooltipServiceWrapper;
         this.controlsPanel = this.controlsWrapper.append("div").classed("controls-panel", true);
         this.controlButtons = this.controlsPanel.append("div").classed("control-buttons", true);
@@ -80,228 +80,269 @@ export class Renderer {
     public async render(imageFrames: ImageFrame[], visualSettings: VisualFormattingSettingsModel): Promise<void> {
         this.imageFrames = imageFrames;
         this.visualSettings = visualSettings;
-        this.currentIndex = 0;
-        this.oldIndex = -1;
 
-        // When a new dataset is loaded, stop any ongoing playback.
-        if (this.isPlaying) {
+        if (this.playerState === PlayerState.Playing || this.playerState === PlayerState.Transitioning) {
             this.pausePlayback();
         }
+        if (this.playbackTimer) {
+            this.playbackTimer.stop();
+        }
 
-        if (imageFrames.length === 0) {
+        if (!imageFrames || imageFrames.length === 0) {
+            this.playerState = PlayerState.Idle;
+            this.imageContainer.selectAll("img").remove();
+            this.captionContainer.text("");
+            this.progressIndicator.selectAll(".dot").remove();
             return;
         }
 
-        const firstFrame = imageFrames[this.currentIndex];
+        this.imageContainer.selectAll("img").remove();
 
-        // Show spinner only on the very first load of the visual.
-        if (!this.isInitialLoading) {
-            this.currentImageElement.classed("hidden", true).classed("visible", false);
-            this.spinnerElement.classed("visible", true);
-            this.isInitialLoading = true;
-        }
+        //this.isInitialLoad = true;
 
-        // Await the image decoding and the first frame render.
+        //if (this.isInitialLoad) {
+        this.playerState = PlayerState.Loading;
+        this.spinnerElement.classed("visible", true);
+        //this.progressIndicator.classed("hidden", true);
+        this.imageContainer.selectAll("img").style("opacity", 0);
+        //}
+
         try {
-            const decodedImg = await this.loadAndDecode(firstFrame.imageUri);
-
-            if (this.isInitialLoading) {
-                this.spinnerElement.classed("visible", false);
-                this.currentImageElement.classed("hidden", false).classed("visible", true);
-            }
-
-            if (decodedImg) {
-                // Await the first frame rendering, which includes any initial transition.
-                await this.renderFrame(this.currentIndex, this.oldIndex);
-            }
+            await this.loadAndDecode(imageFrames[0].imageUri);
+            //if (this.isInitialLoad) {
+            this.spinnerElement.classed("visible", false);
+            //this.isInitialLoad = false;
+            //}
+            await this.navigateToFrame(0, 0); // Render first frame instantly
+            this.playerState = PlayerState.Paused;
         } catch (error) {
             console.error("Error during initial render:", error);
+            this.playerState = PlayerState.Idle;
         }
     }
 
-    private async renderFrame(currentIndex: number, oldIndex: number, isSteppingForward: boolean = true): Promise<void> {
-        if (!this.imageFrames || !this.imageFrames[currentIndex]) {
-            return;
-        }
-        this.isFallbackImage = false;
-        const frames = this.imageFrames;
-        const frame = frames[currentIndex];
-        const nextIndex = (currentIndex + 1) % frames.length;
-        this.preloadImage(nextIndex);
-        const newCaption = this.visualSettings.captionCard.show.value ? frame.caption : "";
+    private async navigateToFrame(index: number, duration?: number): Promise<void> {
+        //if (this.playerState === PlayerState.Transitioning || !this.imageFrames[index]) return;
+        if (!this.imageFrames[index]) return;
+
+        const previousState = this.playerState;
+        this.playerState = PlayerState.Transitioning;
+
+        const oldIndex = this.currentIndex;
+        this.currentIndex = index;
+
+        const isSteppingForward = index > oldIndex || (index === 0 && oldIndex === this.imageFrames.length - 1);
+        const transitionDuration = duration ?? (this.visualSettings.transitionCard.show.value ? this.visualSettings.transitionCard.transitionDuration.value : 0);
 
         try {
-            const decodedImg = await this.loadAndDecode(frame.imageUri);
-            if (this.currentIndex !== currentIndex || !decodedImg) {
-                return;
-            }
-            const altText = this.isFallbackImage ? "Error image" : (newCaption || "Image");
-            this.currentImageElement.attr("alt", altText);
-            const { show: hasTransition, transitionType, transitionDuration } = this.visualSettings.transitionCard;
-            const shouldAnimate = oldIndex !== -1 && currentIndex !== oldIndex && hasTransition.value;
-
-            const transitionPromise = this.applyTransition(
-                decodedImg,
-                shouldAnimate ? transitionType.value.value as string : "fade",
-                shouldAnimate ? transitionDuration.value : 0,
-                isSteppingForward
-            );
-
-            this.captionContainer.text(newCaption);
-            const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(frames);
-            dots.exit().remove();
-            const dotsEnter = dots.enter().append("div").classed("dot", true)
-                .on("click", (event, d) => this.selectFrameById(d.identity));
-            dotsEnter.merge(dots)
-                .classed("active", (d, i) => i === currentIndex)
-                .style("opacity", d => d.opacity);
-            this.imageContainer.on("click", () => this.selectFrameById(frame.identity));
-            this.tooltipServiceWrapper.addTooltip(
-                this.progressIndicator.selectAll(".dot"),
-                (datum: ImageFrame) => datum.tooltips,
-                (datum: ImageFrame) => datum.identity
-            );
-            this.tooltipServiceWrapper.addTooltip(
-                this.imageContainer,
-                () => frames[currentIndex].tooltips,
-                () => frames[currentIndex].identity
-            );
-
-            await transitionPromise; // Wait for the transition to complete
+            await this.renderFrame(this.currentIndex, isSteppingForward, transitionDuration);
         } catch (error) {
-            console.error("Error rendering frame:", error);
+            console.error(`Error navigating to frame ${index}:`, error);
+        } finally {
+            if (this.playerState === PlayerState.Transitioning) {
+                this.playerState = (previousState === PlayerState.Playing)
+                    ? PlayerState.Playing
+                    : PlayerState.Paused;
+            }
         }
     }
 
-    private applyTransition(newImageElement: HTMLImageElement, type: string, duration: number, forward: boolean): Promise<void> {
+    private async renderFrame(currentIndex: number, isForward: boolean, duration: number): Promise<void> {
+        const frame = this.imageFrames[currentIndex];
+        if (!frame) return;
+
+        // Preload next image
+        const nextIndex = (currentIndex + 1) % this.imageFrames.length;
+        this.preloadImage(nextIndex);
+
+        // Update caption
+        const newCaption = this.visualSettings.captionCard.show.value ? frame.caption : "";
+        this.captionContainer.text(newCaption);
+
+        // Update progress dots
+        const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(this.imageFrames);
+        dots.enter().append("div").classed("dot", true)
+            .on("click", (event, d) => {
+                const i = this.imageFrames.findIndex(f => f.identity.equals(d.identity));
+                if (i !== -1) this.goToFrameFromButton(i);
+            })
+            .merge(dots)
+            .classed("active", (d, i) => i === currentIndex)
+            .style("opacity", d => d.opacity);
+
+        // Tooltip setup
+        this.imageContainer.on("click", () => this.selectFrameById(frame.identity));
+        this.tooltipServiceWrapper.addTooltip(
+            this.progressIndicator.selectAll(".dot"),
+            (datum: ImageFrame) => datum.tooltips,
+            (datum: ImageFrame) => datum.identity
+        );
+        this.tooltipServiceWrapper.addTooltip(
+            this.imageContainer,
+            () => this.imageFrames[currentIndex].tooltips,
+            () => this.imageFrames[currentIndex].identity
+        );
+
+        // Await the D3 transition
+        const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
+        await this.applyD3Transition(frame, duration, transitionType, isForward);
+    }
+
+    private async applyD3Transition(
+        frame: ImageFrame,
+        duration: number,
+        type: string,
+        isForward: boolean
+    ): Promise<void> {
+        const loadedImg = await this.loadAndDecode(frame.imageUri);        
+        this.imageContainer.selectAll<HTMLImageElement, any>("img").interrupt()
+        this.imageContainer
+            .selectAll<HTMLImageElement, any>("img.exiting-image")
+            .remove();
+
+        // 1. Set up clear, reusable constants
+        const axis = type === "slideHorizontal" ? "X" : "Y";
+        const isSlide = type === "slideHorizontal" || type === "slideVertical";
+        const startValue = isForward ? 100 : -100;
+        const endValue = -startValue;
+
+        const images = this.imageContainer
+            .selectAll<HTMLImageElement, ImageFrame>("img")
+            .data([frame], d => d.identity === null ? `__frame_${d.imageUri}_${Math.random()}` : d.identity.getKey());
+
+        const exitSelection = images.exit().attr("class", "exiting-image");
+
+        const enterSelection = images.enter()
+            .append("img")
+            .attr("src", loadedImg.src)
+            .attr("alt", frame.caption || "Image")
+            .attr("class", "entered-image")
+            .style("position", "absolute")
+            .style("top", "0px")
+            .style("left", "0px")
+            .style("will-change", "transform, opacity")
+            .style("opacity", 0)
+            .style("transform", isSlide ? `translate${axis}(${startValue}%)` : null);
+
+
         return new Promise(resolve => {
-            if (this.activeTransitionCleanup) {
-                this.activeTransitionCleanup();
-            }
-            this.isTransitioning = true;
+            const t = d3Transition().duration(duration);
+            let activeTransitions = 0;
 
-            let imageForTransition = newImageElement;
-            if (newImageElement === this.currentImageElement.node() || newImageElement === this.nextImageElement.node()) {
-                imageForTransition = newImageElement.cloneNode(true) as HTMLImageElement;
-            }
-
-            const standbyNode = this.nextImageElement.node();
-            if (standbyNode?.parentNode) {
-                standbyNode.parentNode.replaceChild(imageForTransition, standbyNode);
-            } else {
-                this.imageContainer.node()?.appendChild(imageForTransition);
-            }
-            this.nextImageElement = d3Select(imageForTransition);
-
-            const nextNode = this.nextImageElement.node();
-            let safetyTimeout: number;
-
-            const cleanup = () => {
-                nextNode?.removeEventListener('animationend', cleanup);
-                clearTimeout(safetyTimeout);
-                const oldCurrent = this.currentImageElement;
-                this.currentImageElement = this.nextImageElement;
-                this.nextImageElement = oldCurrent;
-                this.currentImageElement.style("animation", null).attr("class", "active");
-                this.nextImageElement.style("animation", null).attr("class", "standby");
-                this.isTransitioning = false;
-                this.activeTransitionCleanup = undefined;
-                resolve(); // Resolve the promise when transition is complete
+            const onTransitionEnd = () => {
+                activeTransitions--;
+                if (activeTransitions === 0) {
+                    this.imageContainer.selectAll("img").order();
+                    resolve();
+                }
             };
 
-            this.activeTransitionCleanup = cleanup;
-
-            if (duration === 0) {
-                cleanup();
-                return;
+            // Animate entering selection
+            if (!enterSelection.empty()) {
+                activeTransitions++;
+                const transition = enterSelection.transition(t);
+                if (isSlide) {
+                    transition.styleTween("transform", () => {
+                        const interp = d3Interpolate(startValue, 0);
+                        return time => `translate${axis}(${interp(time)}%)`;
+                    });
+                }
+                transition.style("opacity", 1)
+                    .on("end", () => {
+                        enterSelection.style("will-change", null);
+                        onTransitionEnd();
+                    });
             }
 
-            let currentAnimation: string, nextAnimation: string;
-            const direction = forward ? 'fwd' : 'rev';
-            switch (type) {
-                case 'slideHorizontal':
-                    currentAnimation = direction === 'fwd' ? 'slideOutToRight' : 'slideOutToLeft';
-                    nextAnimation = direction === 'fwd' ? 'slideInFromLeft' : 'slideInFromRight';
-                    break;
-                case 'slideVertical':
-                    currentAnimation = direction === 'fwd' ? 'slideOutToBottom' : 'slideOutToTop';
-                    nextAnimation = direction === 'fwd' ? 'slideInFromTop' : 'slideInFromBottom';
-                    break;
-                default:
-                    currentAnimation = 'fadeOut';
-                    nextAnimation = 'fadeIn';
-                    break;
+            // Animate exiting selection
+            if (!exitSelection.empty()) {
+                activeTransitions++;
+                exitSelection.style("will-change", "transform, opacity");
+                const transition = exitSelection.transition(t);
+                if (isSlide) {
+                    transition.styleTween("transform", () => {
+                        const interp = d3Interpolate(0, endValue);
+                        return time => `translate${axis}(${interp(time)}%)`;
+                    });
+                }
+                transition.style("opacity", 0)
+                    .on("end", onTransitionEnd)
+                    .remove();
             }
 
-            this.currentImageElement.attr("class", "current");
-            this.nextImageElement.attr("class", "next");
-            nextNode?.addEventListener('animationend', cleanup, { once: true });
-            const durationMs = `${duration}ms`;
-            const fillMode = 'forwards';
-            this.currentImageElement.style("animation", `${currentAnimation} ${durationMs} ${fillMode}`);
-            this.nextImageElement.style("animation", `${nextAnimation} ${durationMs} ${fillMode}`);
-            safetyTimeout = window.setTimeout(cleanup, duration + 50);
+            if (activeTransitions === 0) {
+                resolve();
+            }
         });
     }
 
-    private async goToFrame(index: number, startPlayback: boolean = true): Promise<void> {
-        if (this.isPlaying && !startPlayback) {
+    private async goToFrame(index: number): Promise<void> {
+        if (this.playerState === PlayerState.Playing || this.playerState === PlayerState.Transitioning) {
             this.pausePlayback();
         }
-        this.oldIndex = this.currentIndex;
-        const isForward = index > this.oldIndex || (index === 0 && this.oldIndex === this.imageFrames.length - 1);
-        this.currentIndex = index;
-        await this.renderFrame(this.currentIndex, this.oldIndex, isForward);
+        await this.navigateToFrame(index);
     }
 
-    /**
-     * (CORRECTED) The step method is now fully interruptible.
-     */
-    private step(direction: number) {
-        if (this.isPlaying) {
+    private async goToFrameFromButton(index: number): Promise<void> {
+        if (this.playerState === PlayerState.Playing || this.playerState === PlayerState.Transitioning) {
             this.pausePlayback();
         }
-        const frames = this.imageFrames;
-        if (frames.length <= 1 && frames[0]?.identity === null) return;
+        await this.navigateToFrame(index, 100);
+    }
+
+    private async stepFrame(direction: number) {
+        const frameCount = this.imageFrames.length;
+        if (frameCount <= 1) return;
         let newIndex = this.currentIndex + direction;
-        const frameCount = frames.length;
+
         if (newIndex >= frameCount) {
             newIndex = this.isLooping ? 0 : frameCount - 1;
         } else if (newIndex < 0) {
             newIndex = this.isLooping ? frameCount - 1 : 0;
+        }        
+        await this.goToFrameFromButton(newIndex);
+    }
+
+    private togglePlayback() {
+        if (this.playerState === PlayerState.Playing || this.playerState === PlayerState.Transitioning) {
+            this.pausePlayback();
+        } else if (this.playerState === PlayerState.Paused) {
+            this.startPlayback();
         }
-        this.goToFrame(newIndex, false);
     }
 
     private startPlayback() {
-        clearTimeout(this.playbackTimer);
-        this.isPlaying = true;
+        if (this.playerState !== PlayerState.Paused && this.playerState !== PlayerState.Idle) return;
+        this.playerState = PlayerState.Playing;
         this.updateButtonIcon(this.playPauseButton, Renderer.ICONS.pause);
         this.playbackLoop();
     }
 
     private pausePlayback() {
-        this.isPlaying = false;
+        if (this.playerState !== PlayerState.Playing && this.playerState !== PlayerState.Transitioning) return;
+        this.playerState = PlayerState.Paused;
         this.updateButtonIcon(this.playPauseButton, Renderer.ICONS.play);
-        clearTimeout(this.playbackTimer);
+        if (this.playbackTimer) {
+            this.playbackTimer.stop();
+        }
     }
 
-    /**
-     * (REWRITTEN) New playback logic that separates transition and display time.
-     */
     private async playbackLoop() {
-        while (this.isPlaying) {
+        while (this.playerState === PlayerState.Playing) {
             const frames = this.imageFrames;
-            if (!frames || (frames.length <= 1 && frames[0]?.identity === null)) {
+            if (!frames || frames.length <= 1) {
                 this.pausePlayback();
                 break;
             }
-            const nextIndex = this.isLooping
-                ? (this.currentIndex + 1) % frames.length
-                : this.currentIndex + 1;
 
-            if (!this.isLooping && nextIndex >= frames.length) {
+            const displayTime = this.visualSettings.playbackCard.defaultFrameDuration.value;
+            await this.delay(displayTime);
+            if (this.playerState !== PlayerState.Playing) break;
+
+            const nextIndex = (this.currentIndex + 1) % frames.length;
+            if (!this.isLooping && nextIndex === 0) {
                 this.pausePlayback();
+                this.goToFrame(this.imageFrames.length - 1);
                 break;
             }
 
@@ -309,100 +350,66 @@ export class Renderer {
                 this.selectionManager.clear();
                 this.selectionManager.select(frames[nextIndex].identity);
             }
-
-            // 1. Transition to the next frame and wait for it to complete.
-            await this.goToFrame(nextIndex, true);
-
-            // 2. Check if still playing after the transition.
-            if (!this.isPlaying) break;
-
-            // 3. Pause for the specified "display time".
-            const displayTime = this.visualSettings.playbackCard.defaultFrameDuration.value;
-            await this.delay(displayTime);
+            if (this.playerState !== PlayerState.Playing) break;
+            await this.navigateToFrame(nextIndex);
+            if (this.playerState !== PlayerState.Playing) break;
         }
     }
 
-    /**
-     * A cancellable, promise-based delay helper for the playback loop.
-     */
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => {
-            this.playbackTimer = window.setTimeout(resolve, ms);
+            if (this.playbackTimer) this.playbackTimer.stop();
+            this.playbackTimer = timeout(() => resolve(), ms);
         });
     }
-
-    // --- Unchanged Helper Methods Below ---
 
     private selectFrameById(identity: ISelectionId) {
         if (!identity) return;
         this.selectionManager.select(identity);
         const index = this.imageFrames.findIndex(f => f.identity && f.identity.equals(identity));
         if (index !== -1) {
-            this.goToFrame(index, false);
+            this.goToFrame(index);
         }
     }
 
     private async preloadImage(index: number) {
         const frames = this.imageFrames;
         if (!frames || frames.length === 0) return;
-
         const src = frames[index]?.imageUri;
         if (!src) return;
-
-        try {
-            await this.loadAndDecode(src);
-        } catch {
-            // ignore errors
-        }
+        try { await this.loadAndDecode(src); } catch { /* ignore */ }
     }
 
     private async loadAndDecode(src: string): Promise<HTMLImageElement> {
-        if (!src) {
-            return this.useFallbackSvg();
-        }
+        if (!src) return this.useFallbackSvg();
 
         const cached = this.imageCache.get(src);
         if (cached) {
             this.imageCache.delete(src);
             this.imageCache.set(src, cached);
-
-            if (typeof (cached as any).decode === "function") {
+            if (typeof cached.decode === "function") {
                 try { await cached.decode(); } catch { /* ignore */ }
             } else if (!cached.complete) {
-                await new Promise<void>(resolve => {
-                    cached.onload = () => resolve();
-                    cached.onerror = () => resolve();
-                });
+                await new Promise<void>(r => { cached.onload = () => r(); cached.onerror = () => r(); });
             }
             return cached;
         }
 
         const img = new Image();
         let isLoadSuccessful = false;
-
         const wait = new Promise<HTMLImageElement>(resolve => {
-            img.onload = () => {
-                isLoadSuccessful = true;
-                resolve(img);
-            };
-            img.onerror = () => {
-                resolve(this.useFallbackSvg());
-            };
+            img.onload = () => { isLoadSuccessful = true; resolve(img); };
+            img.onerror = () => { resolve(this.useFallbackSvg()); };
         });
-
         img.src = src;
-
         const loadedImage = await wait;
-
-        if (typeof (loadedImage as any).decode === "function") {
+        if (typeof loadedImage.decode === "function") {
             try { await loadedImage.decode(); } catch { /* ignore */ }
         }
-
         if (isLoadSuccessful) {
             this.imageCache.set(src, loadedImage);
             this.evictOldestIfNeeded();
         }
-
         return loadedImage;
     }
 
@@ -414,11 +421,11 @@ export class Renderer {
                 this.controlsWrapper.classed("is-expanded", !isExpanded);
             });
 
-        this.createIconButton(this.controlButtons, Renderer.ICONS.goToStart).on("click", () => this.goToFrame(0, false));
-        this.createIconButton(this.controlButtons, Renderer.ICONS.stepBack).on("click", () => this.step(-1));
+        this.createIconButton(this.controlButtons, Renderer.ICONS.goToStart).on("click", () => this.goToFrameFromButton(0));
+        this.createIconButton(this.controlButtons, Renderer.ICONS.stepBack).on("click", () => this.stepFrame(-1));
         this.playPauseButton = this.createIconButton(this.controlButtons, Renderer.ICONS.play).on("click", () => this.togglePlayback());
-        this.createIconButton(this.controlButtons, Renderer.ICONS.stepForward).on("click", () => this.step(1));
-        this.createIconButton(this.controlButtons, Renderer.ICONS.goToEnd).on("click", () => this.goToFrame(this.imageFrames.length - 1, false));
+        this.createIconButton(this.controlButtons, Renderer.ICONS.stepForward).on("click", () => this.stepFrame(1));
+        this.createIconButton(this.controlButtons, Renderer.ICONS.goToEnd).on("click", () => this.goToFrameFromButton(this.imageFrames.length - 1));
         this.createIconButton(this.controlButtons, Renderer.ICONS.loop)
             .classed("loop-toggle", true)
             .on("click", (event) => {
@@ -427,46 +434,25 @@ export class Renderer {
             });
     }
 
-    private togglePlayback() {
-        this.isPlaying ? this.pausePlayback() : this.startPlayback();
-    }
-
-    // ... other unchanged helpers (setupSpinner, useFallbackSvg, iconButton logic, etc.) ...
-
     private setupSpinner() {
-        this.spinnerSvg
-            .attr("width", 50)
-            .attr("height", 50)
-            .attr("viewBox", "0 0 50 50");
+        this.spinnerSvg.attr("width", 50).attr("height", 50).attr("viewBox", "0 0 50 50");
         const circle = this.spinnerSvg.append("circle")
-            .attr("cx", 25)
-            .attr("cy", 25)
-            .attr("r", 20)
-            .attr("stroke", "#605E5C")
-            .attr("stroke-width", 7)
-            .attr("fill", "none")
-            .attr("stroke-linecap", "round")
+            .attr("cx", 25).attr("cy", 25).attr("r", 20).attr("stroke", "#605E5C")
+            .attr("stroke-width", 7).attr("fill", "none").attr("stroke-linecap", "round")
             .attr("stroke-dasharray", "94.2 31.4");
-        circle.append("animateTransform")
-            .attr("attributeName", "transform")
-            .attr("type", "rotate")
-            .attr("from", "0 25 25")
-            .attr("to", "360 25 25")
-            .attr("dur", "1s")
-            .attr("repeatCount", "indefinite");
+        circle.append("animateTransform").attr("attributeName", "transform").attr("type", "rotate")
+            .attr("from", "0 25 25").attr("to", "360 25 25").attr("dur", "1s").attr("repeatCount", "indefinite");
     }
 
     private useFallbackSvg(): HTMLImageElement {
         const fallbackImage = new Image();
         const svgStr = this.buildFallbackSvgString("#FF0000", "#000000", 0.4);
-        const encodedSvg = encodeURIComponent(svgStr);
-        fallbackImage.src = `data:image/svg+xml,${encodedSvg}`;
-        this.isFallbackImage = true;
+        fallbackImage.src = `data:image/svg+xml,${encodeURIComponent(svgStr)}`;
         return fallbackImage;
     }
 
-    private buildFallbackSvgString(diagonalLineColor: string, backgroundShapesColor: string, imageOpacity: number): string {
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8"><g opacity="${imageOpacity}"><path d="m20 20.8.8-.8L.8 0 0 .8Z" fill="${diagonalLineColor}"/><path d="M15.4 6.9a1.5 1.5 0 1 1-1.5-1.5 1.5 1.5 0 0 1 1.5 1.5ZM1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z" fill="${backgroundShapesColor}"/><path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z" fill="${backgroundShapesColor}"/></g></svg>`;
+    private buildFallbackSvgString(lineColor: string, bgColor: string, opacity: number): string {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8"><g opacity="${opacity}"><path d="m20 20.8.8-.8L.8 0 0 .8Z" fill="${lineColor}"/><path d="M15.4 6.9a1.5 1.5 0 1 1-1.5-1.5 1.5 1.5 0 0 1 1.5 1.5ZM1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z" fill="${bgColor}"/><path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z" fill="${bgColor}"/></g></svg>`;
     }
 
     private evictOldestIfNeeded() {

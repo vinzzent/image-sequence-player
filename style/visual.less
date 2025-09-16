@@ -46,29 +46,9 @@
             backface-visibility: hidden;
             object-fit: var(--alignment);
 
-            // Base states
-            &.active,
-            &.current {
-                opacity: 1;
-                z-index: 1;
-            }
-
-            &.standby,
-            &.next {
-                opacity: 0;
-                z-index: 2;
-            }
-
-            // Fade visibility toggles
-            &.hidden {
-                opacity: 0;
-                transition: opacity 0.25s ease;
-            }
-
-            &.visible {
-                opacity: 1;
-                transition: opacity 0.25s ease;
-            }
+            /* REMOVED: The state-based classes (.active, .current, .standby, .next, .hidden, .visible) 
+             were deleted from here because D3 now handles all image styling and transitions directly.
+            */
         }
 
         .spinner {
@@ -320,120 +300,7 @@
         }
     }
 }
-
-/* --- KEYFRAME ANIMATION ENGINE --- */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-
-    to {
-        opacity: 0;
-    }
-}
-
-@keyframes slideInFromRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToLeft {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-}
-
-@keyframes slideInFromLeft {
-    from {
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToRight {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-}
-
-@keyframes slideInFromBottom {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToTop {
-    from {
-        transform: translateY(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-}
-
-@keyframes slideInFromTop {
-    from {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOutToBottom {
-    from {
-        transform: translateY(0);
-        opacity: 1;
-    }
-
-    to {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-}
+/*
+NOTE: Any @keyframes rules that were previously here should be removed. 
+All animations are now handled by D3 in TypeScript.
+*/

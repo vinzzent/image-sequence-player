@@ -17,12 +17,18 @@ interface ImageFrame {
     opacity: number;
 }
 
+interface loadedImage {
+    loadSucceeded: boolean;
+    image: HTMLImageElement;
+}
+
 interface IconData {
     viewBox: string;
     path: string;
 }
 
 interface RenderedOptions {
+    allowInteractions: boolean;
     selectionManager: ISelectionManager;
     controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
@@ -40,6 +46,7 @@ enum PlayerState {
 }
 
 export class Renderer {
+    private allowInteractions: boolean;
     private selectionManager: ISelectionManager;
     private imageFrames: ImageFrame[];
     private visualSettings: VisualFormattingSettingsModel;
@@ -63,6 +70,7 @@ export class Renderer {
     private readonly maxCacheEntries: number = 10;
 
     constructor(options: RenderedOptions) {
+        this.allowInteractions = options.allowInteractions;
         this.selectionManager = options.selectionManager;
         this.controlsWrapper = options.controlsWrapper;
         this.progressIndicator = options.progressIndicator;
@@ -163,8 +171,6 @@ export class Renderer {
         const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(this.imageFrames);
         dots.enter().append("div").classed("dot", true)
             .on("click", (event, d) => {
-                //const i = this.imageFrames.findIndex(f => f.identity.equals(d.identity));
-                //if (i !== -1) this.goToFrameFromButton(i);
                 this.selectFrameById(d.identity);
             })
             .merge(dots)
@@ -209,14 +215,21 @@ export class Renderer {
 
         const images = this.imageContainer
             .selectAll<HTMLImageElement, ImageFrame>("img")
-            .data([frame], d => d.identity === null ? `__frame_${d.imageUri}_${Math.random()}` : d.identity.getKey());
+            .data([frame], d => {
+                if (d.identity !== null) return d.identity.getKey();
+                const array = new Uint32Array(1);
+                crypto.getRandomValues(array);
+                return `__frame_${d.imageUri}_${array[0]}`;
+            });
 
         const exitSelection = images.exit().attr("class", "exiting-image");
 
         const enterSelection = images.enter()
             .append("img")
-            .attr("src", loadedImg.src)
-            .attr("alt", frame.caption || "Image")
+            .attr("src", loadedImg.image.src)
+            .attr("alt", loadedImg.loadSucceeded 
+                ? (frame.caption || "Image") 
+                : `${frame.caption || "Image"} (image failed to load)`)
             .attr("class", "entered-image")
             .style("position", "absolute")
             .style("top", "0px")
@@ -365,9 +378,12 @@ export class Renderer {
     }
 
     private selectFrameById(identity: ISelectionId) {
-        if (!identity) return;
+        if (!this.allowInteractions || !identity) {
+            return;
+        }    
         this.selectionManager.select(identity);
         const index = this.imageFrames.findIndex(f => f.identity && f.identity.equals(identity));
+    
         if (index !== -1) {
             this.goToFrame(index);
         }
@@ -381,8 +397,8 @@ export class Renderer {
         try { await this.loadAndDecode(src); } catch { /* ignore */ }
     }
 
-    private async loadAndDecode(src: string): Promise<HTMLImageElement> {
-        if (!src) return this.useFallbackSvg();
+    private async loadAndDecode(src: string): Promise<loadedImage> {
+        if (!src) return {loadSucceeded: false, image: this.useFallbackSvg()};
 
         const cached = this.imageCache.get(src);
         if (cached) {
@@ -393,7 +409,7 @@ export class Renderer {
             } else if (!cached.complete) {
                 await new Promise<void>(r => { cached.onload = () => r(); cached.onerror = () => r(); });
             }
-            return cached;
+            return {loadSucceeded: true, image: cached};
         }
 
         const img = new Image();
@@ -411,7 +427,7 @@ export class Renderer {
             this.imageCache.set(src, loadedImage);
             this.evictOldestIfNeeded();
         }
-        return loadedImage;
+        return {loadSucceeded: isLoadSuccessful, image: loadedImage};
     }
 
     private setupControls() {

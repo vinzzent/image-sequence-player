@@ -43,6 +43,7 @@ export class Visual implements IVisual {
     private events: IVisualEventService;
     private colorPalette: ISandboxExtendedColorPalette;
     private isHighContrast: boolean;
+    private allowInteractions: boolean;
     private selectionManager: ISelectionManager;
     private target: HTMLElement;
     private imageFrames: ImageFrame[];
@@ -63,9 +64,10 @@ export class Visual implements IVisual {
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
-        this.events = options.host.eventService;
-        this.colorPalette = options.host.colorPalette;
-        this.isHighContrast = options.host.colorPalette.isHighContrast;
+        this.events = this.host.eventService;
+        this.colorPalette = this.host.colorPalette;
+        this.isHighContrast = this.host.colorPalette.isHighContrast;
+        this.allowInteractions = this.host.hostCapabilities.allowInteractions;
         this.selectionManager = this.host.createSelectionManager();
         this.target = options.element;
         this.formattingSettingsService = new FormattingSettingsService();
@@ -78,10 +80,11 @@ export class Visual implements IVisual {
         this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);        
         this.imageFrames = [];
         this.tooltipServiceWrapper = createTooltipServiceWrapper(
-            options.host.tooltipService,
+            this.host.tooltipService,
             options.element
         );
         this.renderer = new Renderer({
+            allowInteractions: this.allowInteractions,
             selectionManager: this.selectionManager,
             controlsWrapper: this.controlsWrapper,
             progressIndicator: this.progressIndicator,
@@ -164,8 +167,7 @@ export class Visual implements IVisual {
   * @returns An array of ImageFrame objects.
   */
     private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
-        const categorical = dataView.categorical;
-        console.log(categorical);
+        const categorical = dataView.categorical;        
         const categories = categorical.categories.find(c => c.source.roles?.["category"]);
         const categoryFormat = categories?.source?.format;
 

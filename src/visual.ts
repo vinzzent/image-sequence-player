@@ -1,13 +1,12 @@
 "use strict";
 
-import powerbi from "powerbi-visuals-api";
-import { select as d3Select, Selection } from "d3-selection";
+//import powerbi from "powerbi-visuals-api";
+import { select as d3Select } from "d3-selection";
 import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel";
 import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 import { ITooltipServiceWrapper, createTooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { VisualFormattingSettingsModel } from "./settings";
-import { Renderer } from "./renderVisual";
-
+import { PlayerOrchestrator } from "./player/player-orchestrator";
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
@@ -18,7 +17,6 @@ import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.visuals.ISelectionId;
 import DataView = powerbi.DataView;
 import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
-
 import "./../style/visual.less";
 
 type Formatter = ReturnType<typeof valueFormatter.create>;
@@ -29,7 +27,7 @@ interface ImageFrame {
     imageUri: string;
     caption: string;
     tooltips: VisualTooltipDataItem[];
-    opacity: number;
+    dimmed: boolean;
 }
 
 interface Formatters {
@@ -52,11 +50,11 @@ export class Visual implements IVisual {
     private rootElement: d3.Selection<HTMLDivElement, any, any, any>;
     private contentContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    private captionContainer: d3.Selection<HTMLDivElement, any, any, any>;    
+    private captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
     private controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     private progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     private isDataValid: boolean = false;
-    private renderer: Renderer;
+    private PlayerOrchestrator: PlayerOrchestrator;
     private formatters: Formatters;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
     private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n and \n [Image] \n fields.";
@@ -68,30 +66,31 @@ export class Visual implements IVisual {
         this.colorPalette = this.host.colorPalette;
         this.isHighContrast = this.host.colorPalette.isHighContrast;
         this.allowInteractions = this.host.hostCapabilities.allowInteractions;
-        this.selectionManager = this.host.createSelectionManager();
+        this.selectionManager = this.host.createSelectionManager();        
         this.target = options.element;
-        this.formattingSettingsService = new FormattingSettingsService();
+        this.formattingSettingsService = new FormattingSettingsService();       
         this.rootElement = d3Select(this.target).append("div").classed("image-sequence-player", true);
         this.rootElement.classed("highcontrast", this.isHighContrast);
         this.contentContainer = this.rootElement.append("div").classed("content-container", true);
         this.captionContainer = this.contentContainer.append("div").classed("caption-container", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
         this.progressIndicator = this.rootElement.append("div").classed("progress-indicator", true);
-        this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);        
+        this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
+        this.handleContextMenu();
         this.imageFrames = [];
         this.tooltipServiceWrapper = createTooltipServiceWrapper(
             this.host.tooltipService,
             options.element
         );
-        this.renderer = new Renderer({
+        this.PlayerOrchestrator = new PlayerOrchestrator({
             allowInteractions: this.allowInteractions,
             selectionManager: this.selectionManager,
             controlsWrapper: this.controlsWrapper,
             progressIndicator: this.progressIndicator,
             imageContainer: this.imageContainer,
-            captionContainer: this.captionContainer,           
+            captionContainer: this.captionContainer,
             tooltipServiceWrapper: this.tooltipServiceWrapper
-        });        
+        });
     }
 
     public async update(options: VisualUpdateOptions): Promise<void> {
@@ -117,13 +116,31 @@ export class Visual implements IVisual {
             this.updateStyling(this.visualSettings);
         }
 
-        await this.renderer.render(this.imageFrames, this.visualSettings);
+        await this.PlayerOrchestrator.render(this.imageFrames, this.visualSettings);
 
         this.events.renderingFinished(options);
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         return this.formattingSettingsService.buildFormattingModel(this.visualSettings);
+    }
+
+    /**
+     * Sets up the context menu event listener on the visual's root element.
+     * This uses event delegation to handle right-clicks on the background,
+     * images, and progress dots.
+     */
+    private handleContextMenu(): void {
+        this.rootElement.on("contextmenu", (event: MouseEvent) => {
+            event.preventDefault();    
+            const targetElement = event.target as HTMLElement;            
+            const dataPoint = d3Select(targetElement).datum() as ImageFrame | undefined;            
+            const selectionId = dataPoint?.identity ? dataPoint.identity : {};    
+            this.selectionManager.showContextMenu(selectionId, {
+                x: event.clientX,
+                y: event.clientY
+            });
+        });
     }
 
     private static createPlaceholderSvg(message: string): string {
@@ -167,7 +184,7 @@ export class Visual implements IVisual {
   * @returns An array of ImageFrame objects.
   */
     private transformDataViewToFrames(dataView: DataView): ImageFrame[] {
-        const categorical = dataView.categorical;        
+        const categorical = dataView.categorical;
         const categories = categorical.categories.find(c => c.source.roles?.["category"]);
         const categoryFormat = categories?.source?.format;
 
@@ -202,11 +219,12 @@ export class Visual implements IVisual {
                 .createSelectionId();
 
             // --- Only image highlight logic ---
-            let opacity = 1.0;
+            let dimmed = false; // default: not dimmed (fully visible)
+
             if (isAnyHighlightActive) {
                 const highlightVal = imageHighlights ? imageHighlights[i] : null;
                 if (highlightVal === null || highlightVal === "") {
-                    opacity = 0.4; // Dimmed when not highlighted
+                    dimmed = true; // dimmed when not highlighted
                 }
             }
 
@@ -249,7 +267,7 @@ export class Visual implements IVisual {
                 imageUri: this.uriSanitizer(imageData.values[i] as string),
                 caption: captionText,
                 tooltips: tooltipItems,
-                opacity: opacity
+                dimmed: dimmed
             };
             frames.push(frame);
         }
@@ -357,7 +375,7 @@ export class Visual implements IVisual {
             imageUri: placeholderSvg,
             caption: "Awaiting data",
             tooltips: undefined,
-            opacity: 1.0
+            dimmed: false
         };
         return [placeholderFrame];
     }
@@ -416,21 +434,25 @@ export class Visual implements IVisual {
         const dotColor = this.isHighContrast
             ? this.colorPalette.background.value
             : this.colorPalette.foregroundButton.value;
+        const dotTextColor = this.isHighContrast
+            ? this.colorPalette.foreground.value
+            : this.colorPalette.background.value;
         const hoveredDotColor = this.isHighContrast
             ? this.colorPalette.background.value
             : this.colorPalette.foregroundSelected.value;
-        this.progressIndicator.style("--dot-color", dotColor);
-        this.progressIndicator.style("--dot-border-color", this.colorPalette.foreground.value);
-        this.progressIndicator.style("--hovered-dot-color", hoveredDotColor);
-        this.progressIndicator.style("--hovered-dot-border-color", this.colorPalette.foregroundSelected.value);
-        this.progressIndicator.style("--active-dot-color", navigation.activeDotColor.value.value);
-
         const scrollbarColor = this.isHighContrast
             ? this.colorPalette.background.value
             : this.colorPalette.foregroundButton.value;
 
-        this.progressIndicator.style("--scrollbar-color", scrollbarColor);
-        this.progressIndicator.style("--scrollbar-border-color", this.colorPalette.foreground.value);
+        this.progressIndicator
+            .style("--dot-color", dotColor)
+            .style("--dot-text-color", dotTextColor)
+            .style("--dot-border-color", this.colorPalette.foreground.value)
+            .style("--hovered-dot-color", hoveredDotColor)
+            .style("--hovered-dot-border-color", this.colorPalette.foregroundSelected.value)
+            .style("--active-dot-color", navigation.activeDotColor.value.value)
+            .style("--scrollbar-color", scrollbarColor)
+            .style("--scrollbar-border-color", this.colorPalette.foreground.value);
 
         const panelIndicatorBorderColor = this.isHighContrast
             ? this.colorPalette.foreground.value
@@ -438,8 +460,9 @@ export class Visual implements IVisual {
         const hoveredPanelIndicatorBorderColor = this.isHighContrast
             ? this.colorPalette.foregroundSelected.value
             : this.colorPalette.foreground.value;
-        this.controlsWrapper.style("--panel-indicator-color", this.colorPalette.background.value);
-        this.controlsWrapper.style("--panel-indicator-border-color", panelIndicatorBorderColor);
-        this.controlsWrapper.style("--hovered-panel-indicator-border-color", hoveredPanelIndicatorBorderColor);
+        this.controlsWrapper
+            .style("--panel-indicator-color", this.colorPalette.background.value)
+            .style("--panel-indicator-border-color", panelIndicatorBorderColor)
+            .style("--hovered-panel-indicator-border-color", hoveredPanelIndicatorBorderColor);
     }
 }

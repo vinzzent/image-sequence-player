@@ -4,8 +4,8 @@
 @indicator-size: 16px;
 @collapsed-controls-height: 12px;
 @icon-size: 16px;
-@dot-size: 10px;
-@active-dot-size: 12px;
+@dot-size: 16px;
+@active-dot-size: 18px;
 
 // Main container
 .image-sequence-player {
@@ -133,18 +133,29 @@
             background-color: var(--dot-color, #605E5C);
             border-radius: 50%;
             cursor: pointer;
-            transition: all 0.2s ease;
-
+            transition: all 0.2s ease;        
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: var(--dot-text-color, #FFFFFF);
+        
             &:hover {
                 background-color: var(--hovered-dot-color, #252423);
             }
-
+        
             &.active {
                 background-color: var(--active-dot-color, #0078d4);
                 width: @active-dot-size;
                 height: @active-dot-size;
+                font-size: 10px;
+            }
+            
+            &.dimmed {
+                opacity: 0.4;
             }
         }
+        
     }
 
     // Controls panel

@@ -11,13 +11,13 @@ import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 
 interface RenderedOptions {
-    allowInteractions: boolean;
+    allowInteractions: boolean;     
     selectionManager: ISelectionManager;
+    tooltipServiceWrapper: ITooltipServiceWrapper;
     controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    captionContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    tooltipServiceWrapper: ITooltipServiceWrapper;
+    captionContainer: d3.Selection<HTMLDivElement, any, any, any>;    
 }
 
 interface ImageFrame {
@@ -72,7 +72,7 @@ export class PlayerOrchestrator {
         this.frameManager = new FrameRenderer(
             options.imageContainer,
             options.captionContainer,
-            options.progressIndicator,
+            options.progressIndicator,            
             options.tooltipServiceWrapper,
             this.selectFrameById.bind(this)
         );
@@ -212,6 +212,7 @@ export class PlayerOrchestrator {
             this.selectionManager.select(frame.identity);
         }        
         const showCaption = this.visualSettings.captionCard.show.value;
+        const showDotNumbers = this.visualSettings.navigationCard.dotNumbers.showDotNumbers.value;
         const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
         const finalDuration = duration ?? (this.visualSettings.transitionCard.show.value
             ? this.visualSettings.transitionCard.transitionDuration.value
@@ -224,7 +225,8 @@ export class PlayerOrchestrator {
                 isSteppingForward,
                 finalDuration,
                 transitionType,
-                showCaption
+                showCaption,
+                showDotNumbers
             );
         } catch (error) {
             console.error(`Error navigating to frame ${this.currentIndex}:`, error);

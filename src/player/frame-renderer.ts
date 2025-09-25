@@ -40,7 +40,7 @@ export class FrameRenderer {
     constructor(
         private imageContainer: Selection<HTMLDivElement, any, any, any>,
         private captionContainer: Selection<HTMLDivElement, any, any, any>,
-        private progressIndicator: Selection<HTMLDivElement, any, any, any>,
+        private progressIndicator: Selection<HTMLDivElement, any, any, any>,        
         private tooltipServiceWrapper: ITooltipServiceWrapper,
         private onSelect: (identity: ISelectionId) => void,
     ) { }
@@ -62,11 +62,12 @@ export class FrameRenderer {
         isForward: boolean,
         transitionDuration: number,
         transitionType: string,
-        showCaption: boolean
+        showCaption: boolean,
+        showDotNumbers: boolean
     ): Promise<void> {
         // Now calls the updated updateCaption method
         this.updateCaption(frame.caption, showCaption);
-        this.updateProgressDots(allFrames, currentIndex);
+        this.updateProgressDots(allFrames, currentIndex, showDotNumbers);
         this.bindTooltips(frame, allFrames);
         this.imageContainer.on("click", () => this.onSelect(frame.identity));
 
@@ -112,14 +113,20 @@ export class FrameRenderer {
         this.captionContainer.text(newCaption);
     }
 
-    private updateProgressDots(allFrames: ImageFrame[], currentIndex: number): void {
+    /**
+    * Updates progress dots, highlighting the current frame and optionally showing numbers. 
+    * @param allFrames - Frames to display as dots.
+    * @param currentIndex - Index of the active frame.
+    * @param showDotNumbers - Show numbers inside dots if true.
+    */
+    private updateProgressDots(allFrames: ImageFrame[], currentIndex: number, showDotNumbers: boolean): void {
         const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(allFrames);
         dots.enter().append("div").classed("dot", true)
             .on("click", (event, d) => this.onSelect(d.identity))
             .merge(dots)
             .classed("active", (d, i) => i === currentIndex)
             .classed("dimmed", d => d.dimmed)
-            .text((d, i) => i + 1);
+            .text((d, i) => showDotNumbers ? String(i + 1) : "");
     }
 
     private bindTooltips(currentFrame: ImageFrame, allFrames: ImageFrame[]): void {

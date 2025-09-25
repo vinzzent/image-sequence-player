@@ -17,7 +17,7 @@ import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.visuals.ISelectionId;
 import DataView = powerbi.DataView;
-import IColorPalette = powerbi.extensibility.IColorPalette;
+//import IColorPalette = powerbi.extensibility.IColorPalette;
 //import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
 import "./../style/visual.less";
 
@@ -67,10 +67,10 @@ export class Visual implements IVisual {
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
         this.events = this.host.eventService;
-        //this.colorPalette = this.host.colorPalette;
-        this.colorHelper = new ColorHelper(this.host.colorPalette);
+        //this.colorPalette = this.host.colorPalette;        
         //this.isHighContrast = this.colorHelper.isHighContrast;
         this.allowInteractions = this.host.hostCapabilities.allowInteractions;
+        this.colorHelper = new ColorHelper(this.host.colorPalette);
         this.selectionManager = this.host.createSelectionManager();
         this.target = options.element;
         const localizationManager = options.host.createLocalizationManager();
@@ -88,13 +88,13 @@ export class Visual implements IVisual {
             options.element
         );
         this.PlayerOrchestrator = new PlayerOrchestrator({
-            allowInteractions: this.allowInteractions,
+            allowInteractions: this.allowInteractions,            
             selectionManager: this.selectionManager,
+            tooltipServiceWrapper: this.tooltipServiceWrapper,
             controlsWrapper: this.controlsWrapper,
             progressIndicator: this.progressIndicator,
             imageContainer: this.imageContainer,
-            captionContainer: this.captionContainer,
-            tooltipServiceWrapper: this.tooltipServiceWrapper
+            captionContainer: this.captionContainer            
         });
     }
 

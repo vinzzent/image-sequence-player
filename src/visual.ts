@@ -5,6 +5,7 @@ import { select as d3Select } from "d3-selection";
 import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel";
 import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 import { ITooltipServiceWrapper, createTooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
+import { ColorHelper } from "powerbi-visuals-utils-colorutils";
 import { VisualFormattingSettingsModel } from "./settings";
 import { PlayerOrchestrator } from "./player/player-orchestrator";
 import IVisual = powerbi.extensibility.visual.IVisual;
@@ -16,7 +17,8 @@ import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.visuals.ISelectionId;
 import DataView = powerbi.DataView;
-import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
+import IColorPalette = powerbi.extensibility.IColorPalette;
+//import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
 import "./../style/visual.less";
 
 type Formatter = ReturnType<typeof valueFormatter.create>;
@@ -39,8 +41,10 @@ interface Formatters {
 export class Visual implements IVisual {
     private host: IVisualHost;
     private events: IVisualEventService;
-    private colorPalette: ISandboxExtendedColorPalette;
-    private isHighContrast: boolean;
+    //private colorPalette: ISandboxExtendedColorPalette;
+    //private colorPalette: IColorPalette;
+    private colorHelper: ColorHelper;
+    //private isHighContrast: boolean;
     private allowInteractions: boolean;
     private selectionManager: ISelectionManager;
     private target: HTMLElement;
@@ -63,14 +67,15 @@ export class Visual implements IVisual {
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
         this.events = this.host.eventService;
-        this.colorPalette = this.host.colorPalette;
-        this.isHighContrast = this.host.colorPalette.isHighContrast;
+        //this.colorPalette = this.host.colorPalette;
+        this.colorHelper = new ColorHelper(this.host.colorPalette);
+        //this.isHighContrast = this.colorHelper.isHighContrast;
         this.allowInteractions = this.host.hostCapabilities.allowInteractions;
-        this.selectionManager = this.host.createSelectionManager();        
+        this.selectionManager = this.host.createSelectionManager();
         this.target = options.element;
-        this.formattingSettingsService = new FormattingSettingsService();       
-        this.rootElement = d3Select(this.target).append("div").classed("image-sequence-player", true);
-        this.rootElement.classed("highcontrast", this.isHighContrast);
+        const localizationManager = options.host.createLocalizationManager();
+        this.formattingSettingsService = new FormattingSettingsService(localizationManager);
+        this.rootElement = d3Select(this.target).append("div").classed("image-sequence-player", true).classed("highcontrast", this.colorHelper.isHighContrast);
         this.contentContainer = this.rootElement.append("div").classed("content-container", true);
         this.captionContainer = this.contentContainer.append("div").classed("caption-container", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
@@ -112,7 +117,7 @@ export class Visual implements IVisual {
         this.rootElement.classed("is-invalid", !this.isDataValid);
         if (this.isDataValid) {
             this.moveLabelContainer(this.visualSettings.captionCard.position.value.value as "top" | "bottom");
-            this.moveProgressIndicator(this.visualSettings.navigationCard.position.value.value as "top" | "bottom");
+            this.moveProgressIndicator(this.visualSettings.navigationCard.generalDotSettings.position.value.value as "top" | "bottom");
             this.updateStyling(this.visualSettings);
         }
 
@@ -132,10 +137,10 @@ export class Visual implements IVisual {
      */
     private handleContextMenu(): void {
         this.rootElement.on("contextmenu", (event: MouseEvent) => {
-            event.preventDefault();    
-            const targetElement = event.target as HTMLElement;            
-            const dataPoint = d3Select(targetElement).datum() as ImageFrame | undefined;            
-            const selectionId = dataPoint?.identity ? dataPoint.identity : {};    
+            event.preventDefault();
+            const targetElement = event.target as HTMLElement;
+            const dataPoint = d3Select(targetElement).datum() as ImageFrame | undefined;
+            const selectionId = dataPoint?.identity ? dataPoint.identity : {};
             this.selectionManager.showContextMenu(selectionId, {
                 x: event.clientX,
                 y: event.clientY
@@ -408,7 +413,7 @@ export class Visual implements IVisual {
         const general = settings.generalCard;
         const navigation = settings.navigationCard;
         const caption = settings.captionCard;
-        general.backgroundColor.value.value = general.backgroundColor.value.value || this.colorPalette.background.value;
+        general.backgroundColor.value.value = this.colorHelper.getHighContrastColor("background", general.backgroundColor.value.value || this.colorHelper.getThemeColor("background"));
 
         this.rootElement.style("--visual-background-color", general.backgroundColor.value.value) // Use host background color for better theme integration        
 
@@ -421,48 +426,51 @@ export class Visual implements IVisual {
             .classed("hidden", !caption.show.value)
             .classed("is-bold", caption.font.bold.value)
             .classed("is-italic", caption.font.italic.value)
+            .classed("is-underlined", caption.font.underline.value)
             .style("--caption-font-family", caption.font.fontFamily.value)
             .style("--caption-font-size", `${caption.font.fontSize.value}pt`)
             .style("--caption-color", caption.color.value.value);
     }
 
     private settingColors(settings: VisualFormattingSettingsModel) {
-        const navigation = settings.navigationCard;
-        navigation.activeDotColor.value.value = this.isHighContrast
-            ? this.colorPalette.foregroundSelected.value
-            : navigation.activeDotColor.value.value || this.colorPalette.getColor("activeDot").value;
-        const dotColor = this.isHighContrast
-            ? this.colorPalette.background.value
-            : this.colorPalette.foregroundButton.value;
-        const dotTextColor = this.isHighContrast
-            ? this.colorPalette.foreground.value
-            : this.colorPalette.background.value;
-        const hoveredDotColor = this.isHighContrast
-            ? this.colorPalette.background.value
-            : this.colorPalette.foregroundSelected.value;
-        const scrollbarColor = this.isHighContrast
-            ? this.colorPalette.background.value
-            : this.colorPalette.foregroundButton.value;
+        //const navigation = settings.navigationCard.generalDotSettings;
+        const generalDotSettings = settings.navigationCard.generalDotSettings;
+        const dotNumbers = settings.navigationCard.dotNumbers;
 
+        // ====================================================================
+        // Part A: Update the Settings Model for Formatting Pane UI Sync
+        // ====================================================================
+
+        // First, ensure there's a default color from the theme if the user hasn't picked one.
+        //navigation.activeDotColor.value.value = navigation.activeDotColor.value.value || colorHelper.getThemeColor();
+
+        // Then, ONLY if in high contrast, overwrite the setting's value.
+        // This ensures the color swatch in the format pane shows the high-contrast
+        // color that the user is actually seeing.
+
+
+        generalDotSettings.activeDotColor.value.value = this.colorHelper.getHighContrastColor("foregroundSelected", generalDotSettings.activeDotColor.value.value || this.colorHelper.getThemeColor("hyperlink"));
+        dotNumbers.dotNumbersColor.value.value = this.colorHelper.getHighContrastColor("foreground", dotNumbers.dotNumbersColor.value.value || this.colorHelper.getThemeColor("background"));
+
+        // ====================================================================
+        // Part B: Apply Final Render Colors to the Visual Elements
+        // ====================================================================
+
+        // For rendering, we can now use getHighContrastColor as a direct, one-line conditional.
+        // The second argument is the default/fallback color for non-high-contrast mode.
         this.progressIndicator
-            .style("--dot-color", dotColor)
-            .style("--dot-text-color", dotTextColor)
-            .style("--dot-border-color", this.colorPalette.foreground.value)
-            .style("--hovered-dot-color", hoveredDotColor)
-            .style("--hovered-dot-border-color", this.colorPalette.foregroundSelected.value)
-            .style("--active-dot-color", navigation.activeDotColor.value.value)
-            .style("--scrollbar-color", scrollbarColor)
-            .style("--scrollbar-border-color", this.colorPalette.foreground.value);
+            .style("--dot-color", this.colorHelper.getHighContrastColor("background", this.colorHelper.getThemeColor("foregroundButton")))
+            .style("--dot-text-color", dotNumbers.dotNumbersColor.value.value)
+            .style("--dot-border-color", this.colorHelper.getHighContrastColor("foreground", this.colorHelper.getThemeColor("foreground")))
+            .style("--hovered-dot-color", this.colorHelper.getHighContrastColor("background", this.colorHelper.getThemeColor("foregroundSelected")))
+            .style("--hovered-dot-border-color", this.colorHelper.getHighContrastColor("foregroundSelected", this.colorHelper.getThemeColor("foregroundSelected")))
+            .style("--active-dot-color", generalDotSettings.activeDotColor.value.value)
+            .style("--scrollbar-color", this.colorHelper.getHighContrastColor("background", this.colorHelper.getThemeColor("foregroundButton")))
+            .style("--scrollbar-border-color", this.colorHelper.getHighContrastColor("foreground", this.colorHelper.getThemeColor("foreground")));
 
-        const panelIndicatorBorderColor = this.isHighContrast
-            ? this.colorPalette.foreground.value
-            : this.colorPalette.foregroundButton.value;
-        const hoveredPanelIndicatorBorderColor = this.isHighContrast
-            ? this.colorPalette.foregroundSelected.value
-            : this.colorPalette.foreground.value;
         this.controlsWrapper
-            .style("--panel-indicator-color", this.colorPalette.background.value)
-            .style("--panel-indicator-border-color", panelIndicatorBorderColor)
-            .style("--hovered-panel-indicator-border-color", hoveredPanelIndicatorBorderColor);
+            .style("--panel-indicator-color", this.colorHelper.getHighContrastColor("background", this.colorHelper.getThemeColor("background")))
+            .style("--panel-indicator-border-color", this.colorHelper.getHighContrastColor("foreground", this.colorHelper.getThemeColor("foregroundButton")))
+            .style("--hovered-panel-indicator-border-color", this.colorHelper.getHighContrastColor("foregroundSelected", this.colorHelper.getThemeColor("foreground")));
     }
 }

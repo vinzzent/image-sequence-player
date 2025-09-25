@@ -96,7 +96,7 @@
       "displayName": "Transition Settings",
       "properties": {
         "show": {
-          "displayName": "Show Navigation Dots",
+          "displayName": "Enable Transitions",
           "type": {
             "bool": true
           }
@@ -173,6 +173,12 @@
           "type": {
             "bool": true
           }
+        },
+        "underline": {
+          "displayName": "Underline",
+          "type": {
+            "bool": true
+          }
         }
       }
     },
@@ -193,6 +199,22 @@
         },
         "activeDotColor": {
           "displayName": "Active Dot Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "showDotNumbers": {
+          "displayName": "Show Dot Numbers",
+          "type": {
+            "bool": true
+          }
+        },
+        "dotNumbersColor": {
+          "displayName": "Dot Numbers Color",
           "type": {
             "fill": {
               "solid": {

@@ -139,7 +139,8 @@ export class FrameRenderer {
         const loadedImg = await this.loadAndDecode(frame.imageUri);
         this.imageContainer.selectAll<HTMLImageElement, any>("img").interrupt();
         this.imageContainer
-            .selectAll<HTMLImageElement, any>("img.exiting-image")
+            //.selectAll<HTMLImageElement, any>("img.exiting-image")
+            .selectAll<HTMLImageElement, any>("img")
             .remove();
 
         // 1. Set up clear, reusable constants

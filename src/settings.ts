@@ -5,11 +5,13 @@ import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 
 // --- Import the correct SimpleCard component ---
 import FormattingSettingsSimpleCard = formattingSettings.SimpleCard;
+import FormattingSettingsCompositeCard = formattingSettings.CompositeCard;
 import FormattingSettingsSlice = formattingSettings.Slice;
+import FormattingSettingsGroup = formattingSettings.Group;
 import FormattingSettingsModel = formattingSettings.Model;
 
 // --- Define dropdown options ---
-const transitionTypeOptions: powerbi.IEnumMember[] = [    
+const transitionTypeOptions: powerbi.IEnumMember[] = [
     { value: "fade", displayName: "Fade" },
     { value: "slideHorizontal", displayName: "Slide Horizontally" },
     { value: "slideVertical", displayName: "Slide Vertically" }
@@ -111,30 +113,51 @@ class CaptionSettingsCard extends FormattingSettingsSimpleCard {
         displayName: "Color",
         value: { value: "#333333" }
     });
+
+    fontFamily = new formattingSettings.FontPicker({ name: "fontFamily", value: "Segoe UI" });
+    fontSize = new formattingSettings.NumUpDown({ name: "fontSize", value: 12 });
+    bold = new formattingSettings.ToggleSwitch({ name: "bold", value: false });
+    italic = new formattingSettings.ToggleSwitch({ name: "italic", value: false });
+    underline = new formattingSettings.ToggleSwitch({ name: "underline", value: false });
     
     font = new formattingSettings.FontControl({
         name: "font",
         displayName: "Font",
-        fontFamily: new formattingSettings.FontPicker({ name: "fontFamily", value: "Segoe UI" }),
-        fontSize: new formattingSettings.NumUpDown({ name: "fontSize", value: 12 }),
-        bold: new formattingSettings.ToggleSwitch({ name: "bold", value: false }),
-        italic: new formattingSettings.ToggleSwitch({ name: "italic", value: false })
+        fontFamily: this.fontFamily,
+        fontSize: this.fontSize,
+        bold: this.bold,
+        italic: this.italic,
+        underline: this.underline
     });
 
     topLevelSlice: formattingSettings.ToggleSwitch = this.show;
     slices: FormattingSettingsSlice[] = [this.position, this.type, this.color, this.font];
 }
 
-class NavigationSettingsCard extends FormattingSettingsSimpleCard {
-    name: string = "navigation";
-    displayName: string = "Navigation Settings";
+class DotNumbersGroup extends FormattingSettingsSimpleCard {
+    name: string = "dotNumbers";
+    displayName: string = "Dot Numbers";
 
-    show = new formattingSettings.ToggleSwitch({
-        name: "show",
-        displayName: "Show Navigation Dots",
-        description: "Show or hide the navigation dots.",
+    showDotNumbers = new formattingSettings.ToggleSwitch({
+        name: "showDotNumbers",
+        displayName: "Show Dot Numbers",
+        description: "Show or hide the dot numbers.",
         value: true
     });
+
+    dotNumbersColor = new formattingSettings.ColorPicker({
+        name: "dotNumbersColor",
+        displayName: "Color",
+        value: { value: "" }
+    });
+
+    topLevelSlice: formattingSettings.ToggleSwitch = this.showDotNumbers;
+    slices: FormattingSettingsSlice[] = [this.dotNumbersColor];
+}
+
+class GeneralDotSettingsGroup extends FormattingSettingsSimpleCard {
+    name: string = "generalDotSettings";
+    displayName: string = "General";
 
     position = new formattingSettings.ItemDropdown({
         name: "position",
@@ -148,9 +171,25 @@ class NavigationSettingsCard extends FormattingSettingsSimpleCard {
         displayName: "Color",
         value: { value: "" }
     });
-
-    topLevelSlice: formattingSettings.ToggleSwitch = this.show;
+    
     slices: FormattingSettingsSlice[] = [this.position, this.activeDotColor];
+}
+
+class NavigationSettingsCard extends FormattingSettingsCompositeCard {
+    name: string = "navigation";
+    displayName: string = "Navigation Settings";
+
+    show = new formattingSettings.ToggleSwitch({
+        name: "show",
+        displayName: "Show Navigation Dots",
+        description: "Show or hide the navigation dots.",
+        value: true
+    });
+
+    generalDotSettings = new GeneralDotSettingsGroup();
+    dotNumbers = new DotNumbersGroup();    
+    topLevelSlice: formattingSettings.ToggleSwitch = this.show;
+    groups: FormattingSettingsGroup[] = [this.generalDotSettings, this.dotNumbers];    
 }
 
 class GeneralSettingsCard extends FormattingSettingsSimpleCard {

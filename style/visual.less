@@ -59,6 +59,7 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 10;
+
             &.visible {
                 display: block;
             }
@@ -94,7 +95,7 @@
 
         &.is-underlined {
             text-decoration: underline;
-        }        
+        }
     }
 
     // Progress dots
@@ -131,35 +132,38 @@
         }
 
         .dot {
+            border: none;
+            padding: 0;
+            font-family: inherit;
             flex-shrink: 0;
             width: @dot-size;
             height: @dot-size;
             background-color: var(--dot-color, #605E5C);
             border-radius: 50%;
             cursor: pointer;
-            transition: all 0.2s ease;        
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 8px;
             color: var(--dot-text-color, #FFFFFF);
-        
+
             &:hover {
                 background-color: var(--hovered-dot-color, #252423);
             }
-        
+
             &.active {
                 background-color: var(--active-dot-color, #0078d4);
                 width: @active-dot-size;
                 height: @active-dot-size;
                 font-size: 10px;
             }
-            
+
             &.dimmed {
                 opacity: 0.4;
             }
         }
-        
+
     }
 
     // Controls panel
@@ -315,7 +319,3 @@
         }
     }
 }
-/*
-NOTE: Any @keyframes rules that were previously here should be removed. 
-All animations are now handled by D3 in TypeScript.
-*/

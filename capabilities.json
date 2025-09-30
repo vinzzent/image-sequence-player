@@ -248,6 +248,7 @@
     }
   },
   "supportsHighlight": true,
+  "supportsKeyboardFocus": true,
   "tooltips": {
     "supportedTypes": {
       "default": true,

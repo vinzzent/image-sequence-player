@@ -40,7 +40,7 @@ export class FrameRenderer {
     constructor(
         private imageContainer: Selection<HTMLDivElement, any, any, any>,
         private captionContainer: Selection<HTMLDivElement, any, any, any>,
-        private progressIndicator: Selection<HTMLDivElement, any, any, any>,        
+        private progressIndicator: Selection<HTMLDivElement, any, any, any>,
         private tooltipServiceWrapper: ITooltipServiceWrapper,
         private onSelect: (identity: ISelectionId) => void,
     ) { }
@@ -120,8 +120,8 @@ export class FrameRenderer {
     * @param showDotNumbers - Show numbers inside dots if true.
     */
     private updateProgressDots(allFrames: ImageFrame[], currentIndex: number, showDotNumbers: boolean): void {
-        const dots = this.progressIndicator.selectAll<HTMLDivElement, ImageFrame>(".dot").data(allFrames);
-        dots.enter().append("div").classed("dot", true)
+        const dots = this.progressIndicator.selectAll<HTMLButtonElement, ImageFrame>(".dot").data(allFrames);
+        dots.enter().append("button").classed("dot", true)
             .on("click", (event, d) => this.onSelect(d.identity))
             .merge(dots)
             .classed("active", (d, i) => i === currentIndex)
@@ -278,13 +278,27 @@ export class FrameRenderer {
 
     private useFallbackSvg(): HTMLImageElement {
         const fallbackImage = new Image();
-        const svgStr = this.buildFallbackSvgString("#FF0000", "#000000", 0.4);
+        const svgStr = this.buildFallbackSvgString("#FF0000", "#FF0000", "#000000", "#000000", 0.0, 0.4);
         fallbackImage.src = `data:image/svg+xml,${encodeURIComponent(svgStr)}`;
         return fallbackImage;
     }
 
-    private buildFallbackSvgString(lineColor: string, bgColor: string, opacity: number): string {
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8"><g opacity="${opacity}"><path d="m20 20.8.8-.8L.8 0 0 .8Z" fill="${lineColor}"/><path d="M15.4 6.9a1.5 1.5 0 1 1-1.5-1.5 1.5 1.5 0 0 1 1.5 1.5ZM1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z" fill="${bgColor}"/><path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z" fill="${bgColor}"/></g></svg>`;
+    private buildFallbackSvgString(
+        fillLineColor: string,
+        strokeLineColor: string,
+        fillImgColor: string,
+        strokeImgColor: string,
+        strokeWidth: number,
+        opacity: number,
+    ): string {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
+        <g opacity="${opacity}">
+            <path d="m20 20.8.8-.8L.8 0 0 .8Z" fill="${fillLineColor}" stroke="${strokeLineColor}" stroke-width="${strokeWidth}"/>
+            <circle cx="15.4" cy="6.9" r="1.5" fill="${fillImgColor}" stroke="${strokeImgColor}" stroke-width="${strokeWidth}"/>
+            <path d="M1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z" fill="${fillImgColor}" stroke="${strokeImgColor}" stroke-width="${strokeWidth}"/>
+            <path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z" fill="${fillImgColor}" stroke="${strokeImgColor}" stroke-width="${strokeWidth}"/>
+        </g>
+    </svg>`;
     }
 }
 

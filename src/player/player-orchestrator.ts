@@ -6,7 +6,7 @@ import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { VisualFormattingSettingsModel } from "../settings";
 import { FrameRenderer } from "./frame-renderer";
 import { PlayerUIController } from "./player-ui-controller";
-import { ImageFrame } from "../interfaces";
+import { ImageFrame, ErrorSvgParams } from "../interfaces";
 import ISelectionId = powerbi.visuals.ISelectionId;
 // import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
@@ -15,10 +15,11 @@ interface RenderedOptions {
     allowInteractions: boolean;     
     selectionManager: ISelectionManager;
     tooltipServiceWrapper: ITooltipServiceWrapper;
+    errorSvgParams: ErrorSvgParams;
     controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
     progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    captionContainer: d3.Selection<HTMLDivElement, any, any, any>;    
+    captionContainer: d3.Selection<HTMLDivElement, any, any, any>;        
 }
 
 enum PlayerState {
@@ -67,6 +68,7 @@ export class PlayerOrchestrator {
             options.captionContainer,
             options.progressIndicator,            
             options.tooltipServiceWrapper,
+            options.errorSvgParams,
             this.selectFrameById.bind(this)
         );
 

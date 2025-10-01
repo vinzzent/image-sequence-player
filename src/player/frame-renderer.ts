@@ -6,9 +6,9 @@ import { Selection } from "d3-selection";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { transition as d3Transition } from "d3-transition";
 import { interpolate as d3Interpolate } from "d3-interpolate";
-import { ImageFrame, ErrorImgParams } from "../interfaces";
+import { ImageFrame, ErrorSvgParams } from "../interfaces";
 import ISelectionId = powerbi.visuals.ISelectionId;
-import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
+// import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 
 interface loadedImage {
     loadSucceeded: boolean;
@@ -29,12 +29,13 @@ interface loadedImage {
 export class FrameRenderer {
     private imageCache: Map<string, HTMLImageElement> = new Map();
     private readonly maxCacheEntries: number = 10;
-    
+
     constructor(
         private imageContainer: Selection<HTMLDivElement, any, any, any>,
         private captionContainer: Selection<HTMLDivElement, any, any, any>,
         private progressIndicator: Selection<HTMLDivElement, any, any, any>,
         private tooltipServiceWrapper: ITooltipServiceWrapper,
+        private errorSvgParams: ErrorSvgParams,
         private onSelect: (identity: ISelectionId) => void,
     ) { }
 
@@ -63,7 +64,6 @@ export class FrameRenderer {
         this.updateProgressDots(allFrames, currentIndex, showDotNumbers);
         this.bindTooltips(frame, allFrames);
         this.imageContainer.on("click", () => this.onSelect(frame.identity));
-
         await this.applyD3Transition(frame, transitionDuration, transitionType, isForward);
     }
 
@@ -71,16 +71,16 @@ export class FrameRenderer {
      * Clears all visual elements from the containers.
      */
     public clearContainers(): void {
-        this.imageContainer.selectAll("img").remove();
+        this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
         this.captionContainer.text("");
-        this.progressIndicator.selectAll(".dot").remove();
+        this.progressIndicator.selectAll<HTMLButtonElement, any>(".dot").remove();
     }
 
     /**
  * Clears image container.
  */
     public clearImage(): void {
-        this.imageContainer.selectAll("img").remove();
+        this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
     }
 
     /**
@@ -90,7 +90,7 @@ export class FrameRenderer {
     public async preloadImage(frame: ImageFrame): Promise<void> {
         if (!frame?.imageUri) return;
         try {
-            await this.loadAndDecode(frame.imageUri, frame.errorImgParams);
+            await this.loadAndDecode(frame.imageUri);
         } catch {
             // Preloading failures are ignored as the main render will handle them.
         }
@@ -136,12 +136,37 @@ export class FrameRenderer {
     }
 
     private async applyD3Transition(frame: ImageFrame, duration: number, type: string, isForward: boolean): Promise<void> {
-        const errorParams = frame.errorImgParams;
-        const loadedImg = await this.loadAndDecode(frame.imageUri, errorParams);
+        const loadedImg = await this.loadAndDecode(frame.imageUri);
         this.imageContainer.selectAll<HTMLImageElement, any>("img").interrupt();
+
+        // ======================= SOLUTION START =======================
+        // Guard Clause: If duration is 0, handle it synchronously and exit early.
+        if (duration === 0) {
+            // 1. Ensure a clean container by removing any previous images.
+            this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
+
+            // 2. Append the new image and set its final styles directly.
+            this.imageContainer
+                .selectAll("img")
+                .data([frame])
+                .enter()
+                .append(() => loadedImg.image.cloneNode(true) as HTMLImageElement)
+                .attr("alt", loadedImg.loadSucceeded
+                    ? (frame.caption || "Image")
+                    : `${frame.caption || "Image"} (image failed to load)`)
+                .attr("class", "entered-image")
+                .style("position", "absolute")
+                .style("top", "0px")
+                .style("left", "0px")
+                .style("opacity", 1);
+
+            // 3. Exit the function.
+            return Promise.resolve();
+        }
+        // ======================== SOLUTION END ========================
+
         this.imageContainer
             .selectAll<HTMLImageElement, any>("img.exiting-image")
-            //.selectAll<HTMLImageElement, any>("img")
             .remove();
 
         // 1. Set up clear, reusable constants
@@ -189,8 +214,6 @@ export class FrameRenderer {
             const onTransitionEnd = () => {
                 activeTransitions--;
                 if (activeTransitions === 0) {
-                    // Original logic to re-order DOM elements
-                    this.imageContainer.selectAll("img").order();
                     resolve();
                 }
             };
@@ -234,8 +257,8 @@ export class FrameRenderer {
         });
     }
 
-    private async loadAndDecode(src: string, errorParams: ErrorImgParams): Promise<loadedImage> {
-        if (!src) return { loadSucceeded: false, image: this.useFallbackSvg(errorParams) };
+    private async loadAndDecode(src: string): Promise<loadedImage> {
+        if (!src) return { loadSucceeded: false, image: this.useFallbackSvg() };
 
         const cached = this.imageCache.get(src);
         if (cached) {
@@ -251,7 +274,7 @@ export class FrameRenderer {
             await img.decode();
             isLoadSuccessful = true;
         } catch {
-            img.src = this.useFallbackSvg(errorParams).src; // Use fallback on decode error
+            img.src = this.useFallbackSvg().src; // Use fallback on decode error
             isLoadSuccessful = false;
         }
 
@@ -269,24 +292,24 @@ export class FrameRenderer {
         }
     }
 
-    private useFallbackSvg(errorParams: ErrorImgParams): HTMLImageElement {
+    private useFallbackSvg(): HTMLImageElement {
         const fallbackImage = new Image();
-         const svgStr = this.buildFallbackSvgString(errorParams);
+        const svgStr = this.buildFallbackSvgString();
         fallbackImage.src = `data:image/svg+xml,${encodeURIComponent(svgStr)}`;
         return fallbackImage;
     }
 
-private buildFallbackSvgString(errorParams: ErrorImgParams): string {
-    const {
-        fillLineColor,
-        strokeLineColor,
-        fillImgColor,
-        strokeImgColor,
-        strokeWidth,
-        opacity
-    } = errorParams;
+    private buildFallbackSvgString(): string {
+        const {
+            fillLineColor,
+            strokeLineColor,
+            fillImgColor,
+            strokeImgColor,
+            strokeWidth,
+            opacity
+        } = this.errorSvgParams;
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
         <g opacity="${opacity}">
             <path d="m20 20.8.8-.8L.8 0 0 .8Z" 
                   fill="${fillLineColor}" 
@@ -306,7 +329,7 @@ private buildFallbackSvgString(errorParams: ErrorImgParams): string {
                   stroke-width="${strokeWidth}"/>
         </g>
     </svg>`;
-}
+    }
 }
 
 // #endregion

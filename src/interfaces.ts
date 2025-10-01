@@ -10,11 +10,9 @@ export interface ImageFrame {
     caption: string;
     tooltips: VisualTooltipDataItem[];
     dimmed: boolean;
-    errorImgParams: ErrorImgParams;
-
 }
 
-export interface ErrorImgParams {
+export interface ErrorSvgParams {
     fillLineColor: string;
     strokeLineColor: string;
     fillImgColor: string;

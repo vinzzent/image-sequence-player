@@ -7,7 +7,7 @@ import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 import { ITooltipServiceWrapper, createTooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { ColorHelper } from "powerbi-visuals-utils-colorutils";
 import { VisualFormattingSettingsModel } from "./settings";
-import { ImageFrame, ErrorImgParams } from "./interfaces";
+import { ImageFrame, ErrorSvgParams } from "./interfaces";
 import { PlayerOrchestrator } from "./player/player-orchestrator";
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
@@ -16,7 +16,7 @@ import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructor
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
-import ISelectionId = powerbi.visuals.ISelectionId;
+//import ISelectionId = powerbi.visuals.ISelectionId;
 import DataView = powerbi.DataView;
 //import IColorPalette = powerbi.extensibility.IColorPalette;
 //import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
@@ -54,6 +54,7 @@ export class Visual implements IVisual {
     private PlayerOrchestrator: PlayerOrchestrator;
     private formatters: Formatters;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
+    private errorSvgParams: ErrorSvgParams;
     private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n and \n [Image] \n fields.";
     private static readonly BLOCK_EXTERNAL_URLS: boolean = false;
 
@@ -76,6 +77,7 @@ export class Visual implements IVisual {
         this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);
         this.handleContextMenu();
         this.imageFrames = [];
+        this.errorSvgParams = this.buildErrorSvgParams();
         this.tooltipServiceWrapper = createTooltipServiceWrapper(
             this.host.tooltipService,
             options.element
@@ -84,6 +86,7 @@ export class Visual implements IVisual {
             allowInteractions: this.allowInteractions,
             selectionManager: this.selectionManager,
             tooltipServiceWrapper: this.tooltipServiceWrapper,
+            errorSvgParams: this.errorSvgParams,
             controlsWrapper: this.controlsWrapper,
             progressIndicator: this.progressIndicator,
             imageContainer: this.imageContainer,
@@ -263,15 +266,14 @@ export class Visual implements IVisual {
                 imageUri: this.uriSanitizer(imageData.values[i] as string),
                 caption: captionText,
                 tooltips: tooltipItems,
-                dimmed: dimmed,
-                errorImgParams: this.buildErrorImgParams()
+                dimmed: dimmed
             };
             frames.push(frame);
         }
         return frames;
     }
 
-    private buildErrorImgParams(): ErrorImgParams {
+    private buildErrorSvgParams(): ErrorSvgParams {
         // (a) Fill colors: "background" in HC, else theme "foreground"
         const fillColor = this.colorHelper.getHighContrastColor(
             "background",
@@ -291,7 +293,7 @@ export class Visual implements IVisual {
             strokeLineColor: strokeColor,
             fillImgColor: fillColor,
             strokeImgColor: strokeColor,
-            strokeWidth,
+            strokeWidth: strokeWidth,
             opacity: 0.4
         };
     }
@@ -398,8 +400,7 @@ export class Visual implements IVisual {
             imageUri: placeholderSvg,
             caption: "Awaiting data",
             tooltips: undefined,
-            dimmed: false,
-            errorImgParams: this.buildErrorImgParams()
+            dimmed: false
         };
         return [placeholderFrame];
     }

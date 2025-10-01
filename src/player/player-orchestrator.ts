@@ -6,8 +6,9 @@ import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { VisualFormattingSettingsModel } from "../settings";
 import { FrameRenderer } from "./frame-renderer";
 import { PlayerUIController } from "./player-ui-controller";
+import { ImageFrame } from "../interfaces";
 import ISelectionId = powerbi.visuals.ISelectionId;
-import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
+// import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 
 interface RenderedOptions {
@@ -18,14 +19,6 @@ interface RenderedOptions {
     progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
     imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
     captionContainer: d3.Selection<HTMLDivElement, any, any, any>;    
-}
-
-interface ImageFrame {
-    identity: ISelectionId;
-    imageUri: string;
-    caption: string;
-    tooltips: VisualTooltipDataItem[];
-    dimmed: boolean;
 }
 
 enum PlayerState {

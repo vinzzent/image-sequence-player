@@ -1,12 +1,13 @@
 "use strict";
 
-//import powerbi from "powerbi-visuals-api";
+import powerbi from "powerbi-visuals-api";
 import { select as d3Select } from "d3-selection";
 import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel";
 import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 import { ITooltipServiceWrapper, createTooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { ColorHelper } from "powerbi-visuals-utils-colorutils";
 import { VisualFormattingSettingsModel } from "./settings";
+import { ImageFrame, ErrorImgParams } from "./interfaces";
 import { PlayerOrchestrator } from "./player/player-orchestrator";
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
@@ -24,14 +25,6 @@ import "./../style/visual.less";
 type Formatter = ReturnType<typeof valueFormatter.create>;
 
 // --- Interfaces ---
-interface ImageFrame {
-    identity: ISelectionId;
-    imageUri: string;
-    caption: string;
-    tooltips: VisualTooltipDataItem[];
-    dimmed: boolean;
-}
-
 interface Formatters {
     forCategory: Formatter;
     forValue: Formatter;
@@ -88,13 +81,13 @@ export class Visual implements IVisual {
             options.element
         );
         this.PlayerOrchestrator = new PlayerOrchestrator({
-            allowInteractions: this.allowInteractions,            
+            allowInteractions: this.allowInteractions,
             selectionManager: this.selectionManager,
             tooltipServiceWrapper: this.tooltipServiceWrapper,
             controlsWrapper: this.controlsWrapper,
             progressIndicator: this.progressIndicator,
             imageContainer: this.imageContainer,
-            captionContainer: this.captionContainer            
+            captionContainer: this.captionContainer
         });
     }
 
@@ -148,18 +141,17 @@ export class Visual implements IVisual {
         });
     }
 
-    private static createPlaceholderSvg(message: string): string {
-        const textStyle = `font-family: 'Segoe UI', sans-serif; font-size: 14px; fill: #666666;`;
-
+    private static createPlaceholderSvg(message: string, textColor: string): string {
+        const textStyle = `font-family:'Segoe UI',sans-serif; font-size:14px; fill:${textColor};`;
         const textLines = message.split("\n").map((line, index) =>
             `<tspan x="50%" dy="${index === 0 ? '-0.5em' : '1.2em'}">${line}</tspan>`
         ).join("");
 
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                    <text x="50%" y="50%" text-anchor="middle" style="${textStyle}">
-                        ${textLines}
-                    </text>
-                 </svg>`;
+        <text x="50%" y="50%" text-anchor="middle" style="${textStyle}">
+            ${textLines}
+        </text>
+    </svg>`;
 
         return `data:image/svg+xml,${encodeURIComponent(svg)}`;
     }
@@ -223,7 +215,6 @@ export class Visual implements IVisual {
                 .withCategory(categories, i)
                 .createSelectionId();
 
-            // --- Only image highlight logic ---
             let dimmed = false; // default: not dimmed (fully visible)
 
             if (isAnyHighlightActive) {
@@ -272,11 +263,37 @@ export class Visual implements IVisual {
                 imageUri: this.uriSanitizer(imageData.values[i] as string),
                 caption: captionText,
                 tooltips: tooltipItems,
-                dimmed: dimmed
+                dimmed: dimmed,
+                errorImgParams: this.buildErrorImgParams()
             };
             frames.push(frame);
         }
         return frames;
+    }
+
+    private buildErrorImgParams(): ErrorImgParams {
+        // (a) Fill colors: "background" in HC, else theme "foreground"
+        const fillColor = this.colorHelper.getHighContrastColor(
+            "background",
+            this.colorHelper.getThemeColor("foreground")
+        );
+
+        // (b) Stroke colors: always "foreground"
+        const strokeColor = this.colorHelper.getHighContrastColor(
+            "foreground",
+            this.colorHelper.getThemeColor("foreground")
+        );
+
+        const strokeWidth = this.colorHelper.isHighContrast ? 2 : 0;
+
+        return {
+            fillLineColor: fillColor,
+            strokeLineColor: strokeColor,
+            fillImgColor: fillColor,
+            strokeImgColor: strokeColor,
+            strokeWidth,
+            opacity: 0.4
+        };
     }
 
 
@@ -374,13 +391,15 @@ export class Visual implements IVisual {
     }
 
     private createAwaitingDataFrames(): ImageFrame[] {
-        const placeholderSvg = Visual.createPlaceholderSvg(Visual.INVALID_MESSAGE);
+        const textColor = this.colorHelper.getHighContrastColor("foreground", this.colorHelper.getThemeColor("foreground"));
+        const placeholderSvg = Visual.createPlaceholderSvg(Visual.INVALID_MESSAGE, textColor);
         const placeholderFrame: ImageFrame = {
             identity: null,
             imageUri: placeholderSvg,
             caption: "Awaiting data",
             tooltips: undefined,
-            dimmed: false
+            dimmed: false,
+            errorImgParams: this.buildErrorImgParams()
         };
         return [placeholderFrame];
     }
@@ -451,6 +470,7 @@ export class Visual implements IVisual {
 
         generalDotSettings.activeDotColor.value.value = this.colorHelper.getHighContrastColor("foregroundSelected", generalDotSettings.activeDotColor.value.value || this.colorHelper.getThemeColor("hyperlink"));
         dotNumbers.dotNumbersColor.value.value = this.colorHelper.getHighContrastColor("foreground", dotNumbers.dotNumbersColor.value.value || this.colorHelper.getThemeColor("background"));
+        this.colorHelper.getThemeColor("foreground");
 
         // ====================================================================
         // Part B: Apply Final Render Colors to the Visual Elements

@@ -119,7 +119,7 @@ class CaptionSettingsCard extends FormattingSettingsSimpleCard {
     bold = new formattingSettings.ToggleSwitch({ name: "bold", value: false });
     italic = new formattingSettings.ToggleSwitch({ name: "italic", value: false });
     underline = new formattingSettings.ToggleSwitch({ name: "underline", value: false });
-    
+
     font = new formattingSettings.FontControl({
         name: "font",
         displayName: "Font",
@@ -171,7 +171,7 @@ class GeneralDotSettingsGroup extends FormattingSettingsSimpleCard {
         displayName: "Color",
         value: { value: "" }
     });
-    
+
     slices: FormattingSettingsSlice[] = [this.position, this.activeDotColor];
 }
 
@@ -187,9 +187,9 @@ class NavigationSettingsCard extends FormattingSettingsCompositeCard {
     });
 
     generalDotSettings = new GeneralDotSettingsGroup();
-    dotNumbers = new DotNumbersGroup();    
+    dotNumbers = new DotNumbersGroup();
     topLevelSlice: formattingSettings.ToggleSwitch = this.show;
-    groups: FormattingSettingsGroup[] = [this.generalDotSettings, this.dotNumbers];    
+    groups: FormattingSettingsGroup[] = [this.generalDotSettings, this.dotNumbers];
 }
 
 class GeneralSettingsCard extends FormattingSettingsSimpleCard {
@@ -204,7 +204,7 @@ class GeneralSettingsCard extends FormattingSettingsSimpleCard {
     });
 
     backgroundColor = new formattingSettings.ColorPicker({
-        name: "backgroundColor",       
+        name: "backgroundColor",
         displayName: "Background Color",
         value: { value: "" }
     });

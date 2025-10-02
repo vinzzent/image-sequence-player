@@ -6,9 +6,8 @@ import { Selection } from "d3-selection";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { transition as d3Transition } from "d3-transition";
 import { interpolate as d3Interpolate } from "d3-interpolate";
-import { ImageFrame, ErrorSvgParams } from "../interfaces";
+import { ImageFrame } from "../common-interfaces";
 import ISelectionId = powerbi.visuals.ISelectionId;
-// import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 
 interface loadedImage {
     loadSucceeded: boolean;
@@ -35,7 +34,7 @@ export class FrameRenderer {
         private captionContainer: Selection<HTMLDivElement, any, any, any>,
         private progressIndicator: Selection<HTMLDivElement, any, any, any>,
         private tooltipServiceWrapper: ITooltipServiceWrapper,
-        private errorSvgParams: ErrorSvgParams,
+        private errorSvgString: string,
         private onSelect: (identity: ISelectionId) => void,
     ) { }
 
@@ -70,15 +69,15 @@ export class FrameRenderer {
     /**
      * Clears all visual elements from the containers.
      */
-    public clearContainers(): void {
+    public clearContainers() {
         this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
         this.captionContainer.text("");
         this.progressIndicator.selectAll<HTMLButtonElement, any>(".dot").remove();
     }
 
     /**
- * Clears image container.
- */
+    * Clears image container.
+    */
     public clearImage(): void {
         this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
     }
@@ -122,6 +121,11 @@ export class FrameRenderer {
             .text((d, i) => showDotNumbers ? String(i + 1) : "");
     }
 
+    /**
+    * Attaches tooltips to the progress indicator dots and image container for the current frame.
+    * @param currentFrame The ImageFrame whose tooltips are currently active.
+    * @param allFrames All ImageFrames in the visual (used for reference if needed).
+    */
     private bindTooltips(currentFrame: ImageFrame, allFrames: ImageFrame[]): void {
         this.tooltipServiceWrapper.addTooltip(
             this.progressIndicator.selectAll(".dot"),
@@ -135,12 +139,18 @@ export class FrameRenderer {
         );
     }
 
+    /**
+    * Applies a D3-based transition to an image frame, handling slide or fade animations.
+    * @param frame The ImageFrame to display with the transition.
+    * @param duration Duration of the transition in milliseconds.
+    * @param type Type of transition, e.g., "slideHorizontal" or "slideVertical".
+    * @param isForward Direction of the transition; true for forward, false for backward.
+    * @returns A Promise that resolves once the transition completes.
+    **/
     private async applyD3Transition(frame: ImageFrame, duration: number, type: string, isForward: boolean): Promise<void> {
         const loadedImg = await this.loadAndDecode(frame.imageUri);
         this.imageContainer.selectAll<HTMLImageElement, any>("img").interrupt();
-
-        // ======================= SOLUTION START =======================
-        // Guard Clause: If duration is 0, handle it synchronously and exit early.
+        
         if (duration === 0) {
             // 1. Ensure a clean container by removing any previous images.
             this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
@@ -162,8 +172,7 @@ export class FrameRenderer {
 
             // 3. Exit the function.
             return Promise.resolve();
-        }
-        // ======================== SOLUTION END ========================
+        }        
 
         this.imageContainer
             .selectAll<HTMLImageElement, any>("img.exiting-image")
@@ -257,6 +266,11 @@ export class FrameRenderer {
         });
     }
 
+    /**
+    * Loads an image from a source URL or data URI and decodes it for rendering.
+    * @param src The image source string to load and decode.
+    * @returns A Promise resolving to an object containing the loaded Image and a success flag.
+    */
     private async loadAndDecode(src: string): Promise<loadedImage> {
         if (!src) return { loadSucceeded: false, image: this.useFallbackSvg() };
 
@@ -285,6 +299,9 @@ export class FrameRenderer {
         return { loadSucceeded: isLoadSuccessful, image: img };
     }
 
+    /**
+    * Removes the oldest entries from the image cache if it exceeds the maximum size.
+    */
     private evictOldestIfNeeded(): void {
         while (this.imageCache.size > this.maxCacheEntries) {
             const oldestKey = this.imageCache.keys().next().value;
@@ -292,44 +309,16 @@ export class FrameRenderer {
         }
     }
 
+    /**
+    * Creates an HTMLImageElement using a fallback error SVG.
+    * @returns An Image element containing the fallback SVG.
+    */
     private useFallbackSvg(): HTMLImageElement {
         const fallbackImage = new Image();
-        const svgStr = this.buildFallbackSvgString();
+        const svgStr = this.errorSvgString;
         fallbackImage.src = `data:image/svg+xml,${encodeURIComponent(svgStr)}`;
         return fallbackImage;
-    }
-
-    private buildFallbackSvgString(): string {
-        const {
-            fillLineColor,
-            strokeLineColor,
-            fillImgColor,
-            strokeImgColor,
-            strokeWidth,
-            opacity
-        } = this.errorSvgParams;
-
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
-        <g opacity="${opacity}">
-            <path d="m20 20.8.8-.8L.8 0 0 .8Z" 
-                  fill="${fillLineColor}" 
-                  stroke="${strokeLineColor}" 
-                  stroke-width="${strokeWidth}"/>
-            <circle cx="15.4" cy="6.9" r="1.5" 
-                    fill="${fillImgColor}" 
-                    stroke="${strokeImgColor}" 
-                    stroke-width="${strokeWidth}"/>
-            <path d="M1.4 18.4v-.5l3-3a1.5 1.5 0 0 0 .6.2 1.4 1.4 0 0 0 1-.4l3-3-.8-.6L5.4 14a.5.5 0 0 1-.7 0 .5.5 0 0 0-.7 0l-2.6 2.4V4.2l-1-1v16.2h16.2l-1-1z" 
-                  fill="${fillImgColor}" 
-                  stroke="${strokeImgColor}" 
-                  stroke-width="${strokeWidth}"/>
-            <path d="m6.2 3.4-1-1h15.2v15.2l-1-1v-.7l-3.1-3.1-.4.3-.7-.8.8-.6a.5.5 0 0 1 .7 0l2.7 2.8V3.4Z" 
-                  fill="${fillImgColor}" 
-                  stroke="${strokeImgColor}" 
-                  stroke-width="${strokeWidth}"/>
-        </g>
-    </svg>`;
-    }
+    }    
 }
 
 // #endregion

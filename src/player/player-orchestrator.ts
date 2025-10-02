@@ -2,24 +2,24 @@
 
 // #region IMPORTS, INTERFACES & ENUMS
 
+import {Selection as d3Selection} from "d3"; 
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { VisualFormattingSettingsModel } from "../settings";
 import { FrameRenderer } from "./frame-renderer";
 import { PlayerUIController } from "./player-ui-controller";
-import { ImageFrame, ErrorSvgParams } from "../interfaces";
+import { ImageFrame } from "../common-interfaces";
 import ISelectionId = powerbi.visuals.ISelectionId;
-// import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 
 interface RenderedOptions {
     allowInteractions: boolean;     
     selectionManager: ISelectionManager;
     tooltipServiceWrapper: ITooltipServiceWrapper;
-    errorSvgParams: ErrorSvgParams;
-    controlsWrapper: d3.Selection<HTMLDivElement, any, any, any>;
-    progressIndicator: d3.Selection<HTMLDivElement, any, any, any>;
-    imageContainer: d3.Selection<HTMLDivElement, any, any, any>;
-    captionContainer: d3.Selection<HTMLDivElement, any, any, any>;        
+    errorSvgString: string;
+    controlsWrapper: d3Selection<HTMLDivElement, any, any, any>;
+    progressIndicator: d3Selection<HTMLDivElement, any, any, any>;
+    imageContainer: d3Selection<HTMLDivElement, any, any, any>;
+    captionContainer: d3Selection<HTMLDivElement, any, any, any>;        
 }
 
 enum PlayerState {
@@ -50,7 +50,7 @@ export class PlayerOrchestrator {
     private currentIndex: number = 0;
     private selectionManager: ISelectionManager;
     private allowInteractions: boolean;
-    private spinnerElement: d3.Selection<HTMLDivElement, any, any, any>;
+    private spinnerElement: d3Selection<HTMLDivElement, any, any, any>;
 
     constructor(options: RenderedOptions) {
         this.selectionManager = options.selectionManager;
@@ -68,7 +68,7 @@ export class PlayerOrchestrator {
             options.captionContainer,
             options.progressIndicator,            
             options.tooltipServiceWrapper,
-            options.errorSvgParams,
+            options.errorSvgString,
             this.selectFrameById.bind(this)
         );
 
@@ -109,8 +109,10 @@ export class PlayerOrchestrator {
         }
     }
 
-    private togglePlayback(): void {
-        // Reads state from this.playerState
+    /**
+    * Toggles playback state between playing and paused based on the current player state.
+    */
+    private togglePlayback() {        
         if (this.playerState === PlayerState.Playing || this.playerState === PlayerState.Transitioning) {
             this.pausePlayback();
         } else if (this.playerState === PlayerState.Paused || this.playerState === PlayerState.Idle) {
@@ -118,37 +120,39 @@ export class PlayerOrchestrator {
         }
     }
 
-    private startPlayback(): void {
-        // Reads state from this.playerState
+    /**
+    * Starts playback if not already playing and there are multiple frames.
+    */
+    private startPlayback() {        
         if (this.playerState === PlayerState.Playing || this.imageFrames.length <= 1) return;
-
         // Sets its own state and notifies the UI
         this.playerState = PlayerState.Playing;
         this.playerUI.updatePlayPauseIcon(true);
         this.playbackLoop();
     }
 
-    private pausePlayback(): void {
-        // Reads state from this.playerState
+    /**
+    * Pauses playback and updates the player UI accordingly.
+    */
+    private pausePlayback() {
         if (this.playerState === PlayerState.Paused || this.playerState === PlayerState.Idle) return;
-
         // Sets its own state and notifies the UI
         this.playerState = PlayerState.Paused;
         this.playerUI.updatePlayPauseIcon(false);
         this.playerUI.setTimer(false);
     }
 
+    /**
+    * Continuously advances frames at the configured interval while playback is active.
+    * @returns A Promise that resolves after setting up the timer for the next frame.
+    */
     private async playbackLoop(): Promise<void> {
         // Reads state from this.playerState
         if (this.playerState !== PlayerState.Playing) return;
-
         const displayTime = this.visualSettings.playbackCard.defaultFrameDuration.value;
-
         this.playerUI.setTimer(true, async () => {
             if (this.playerState !== PlayerState.Playing) return;
-
             await this.stepFrame(1);
-
             // Continue the loop if still in a playing state
             if (this.playerState === PlayerState.Playing) {
                 this.playbackLoop();
@@ -156,12 +160,16 @@ export class PlayerOrchestrator {
         }, displayTime);
     }
 
+    /**
+    * Advances the current frame by a specified direction, respecting looping and boundaries.
+    * @param direction Number of frames to move; positive for forward, negative for backward.
+    * @param duration Optional duration for the frame transition.
+    * @returns A Promise that resolves once the frame navigation completes.
+    */
     private async stepFrame(direction: number, duration?: number): Promise<void> {
         const frameCount = this.imageFrames.length;
         if (frameCount <= 1) return;
-
         let newIndex = this.currentIndex + direction;
-
         if (newIndex >= frameCount) {
             if (this.playerUI.isLooping) {
                 newIndex = 0;
@@ -172,7 +180,6 @@ export class PlayerOrchestrator {
         } else if (newIndex < 0) {
             newIndex = this.playerUI.isLooping ? frameCount - 1 : 0;
         }
-
         if (newIndex !== this.currentIndex) {
             await (duration !== undefined
                 ? this.navigateToFrame(newIndex, duration)
@@ -180,12 +187,22 @@ export class PlayerOrchestrator {
         }
     }
 
+    /**
+    * Advances the frame in a given direction when triggered by a button, pausing playback first.
+    * @param direction Number of frames to move; positive for forward, negative for backward.
+    * @returns A Promise that resolves once the frame navigation completes.
+    */
     private async stepFrameFromButton(direction: number): Promise<void> {
         this.pausePlayback();
         await this.stepFrame(direction, 100);
     }
 
-
+    /**
+    * Navigates to a specific frame, optionally with a transition, and handles selection, preloading, and captions.
+    * @param index The target frame index to navigate to; -1 wraps to the last frame.
+    * @param duration Optional duration for the frame transition.
+    * @returns A Promise that resolves once the frame has been rendered.
+    */
     private async navigateToFrame(index: number, duration?: number): Promise<void> {       
         if (!this.imageFrames.length) {
             return;
@@ -232,6 +249,11 @@ export class PlayerOrchestrator {
         }
     }
 
+    /**
+    * Navigates to a specific frame when triggered by a button, pausing playback first.
+    * @param index The target frame index to navigate to.
+    * @returns A Promise that resolves once the frame has been rendered.
+    */
     private async navigateToFrameFromButton(index: number): Promise<void> {
         if (this.playerState === PlayerState.Playing || this.playerState === PlayerState.Transitioning) {
             this.pausePlayback();
@@ -239,6 +261,11 @@ export class PlayerOrchestrator {
         await this.navigateToFrame(index, 100);
     }
 
+    /**
+    * Selects a frame by its selection identity, pauses playback, and navigates to it if different from the current frame.
+    * @param identity The selection identity of the frame to select.
+    * @returns A Promise that resolves once navigation to the selected frame completes.
+    */
     private async selectFrameById(identity: ISelectionId): Promise<void> {
         if (!this.allowInteractions || !identity) return;
         this.pausePlayback();
@@ -249,6 +276,9 @@ export class PlayerOrchestrator {
         }
     }
 
+    /**
+    * Sets up an SVG-based loading spinner inside the spinner container element.
+    */
     private setupSpinner(): void {
         const svg = this.spinnerElement.append("svg").attr("width", 50).attr("height", 50).attr("viewBox", "0 0 50 50");
         const circle = svg.append("circle")

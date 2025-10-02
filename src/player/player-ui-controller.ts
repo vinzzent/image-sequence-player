@@ -34,7 +34,10 @@ export class PlayerUIController {
     ) {
         this.setupControls();
     }
-
+    
+    /**
+    * Returns whether the playback is currently set to loop.
+    */
     get isLooping() {
         return this._isLooping;
     }
@@ -62,6 +65,9 @@ export class PlayerUIController {
         }
     }
 
+    /**
+    * Creates and attaches playback control buttons, including navigation, play/pause, and looping toggle.
+    */
     private setupControls(): void {
         this.createIconButton(this.controlsWrapper, PlayerUIController.ICONS.upArrow)
             .classed("panel-indicator", true)
@@ -86,6 +92,12 @@ export class PlayerUIController {
             });
     }
 
+    /**
+    * Creates a button with an SVG icon inside a given container.
+    * @param container The D3 selection of the container to append the button to.
+    * @param iconData The SVG path and viewBox data for the icon.
+    * @returns The D3 selection of the created button element.
+    */
     private createIconButton(container: Selection<any, any, any, any>, iconData: IconData): Selection<HTMLButtonElement, any, any, any> {
         const button = container.append("button");
         const svg = button.append("svg").attr("viewBox", iconData.viewBox);
@@ -93,12 +105,20 @@ export class PlayerUIController {
         return button;
     }
 
+    /**
+    * Updates an existing button's SVG icon with new icon data.
+    * @param button The D3 selection of the button to update.
+    * @param iconData The SVG path and viewBox data for the new icon.
+    */
     private updateButtonIcon(button: Selection<HTMLButtonElement, any, any, any>, iconData: IconData): void {
         button.selectAll("*").remove();
         const svg = button.append("svg").attr("viewBox", iconData.viewBox);
         svg.append("path").attr("d", iconData.path);
     }
 
+    /**
+    * Predefined SVG icon data for playback and navigation controls.
+    */
     private static readonly ICONS: { [key: string]: IconData } = {
         play: { viewBox: "0 0 24 24", path: "M8 5v14l11-7z" },
         pause: { viewBox: "0 0 24 24", path: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" },

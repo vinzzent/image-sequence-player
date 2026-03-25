@@ -73,71 +73,57 @@
     "default": {}
   },
   "objects": {
-    "playback": {
-      "displayName": "Playback Settings",
+    "playback": {      
       "properties": {
         "selectionSequence": {
-          "displayName": "Selection Sequence",
-          "description": "Enable to apply a filter for each frame during playback.",
           "type": {
             "bool": true
           }
         },
-        "defaultFrameDuration": {
-          "displayName": "Default Frame Duration (ms)",
-          "description": "The time each frame is displayed during playback.",
+        "defaultFrameDuration": {          
           "type": {
             "numeric": true
           }
         }
       }
     },
-    "transition": {
-      "displayName": "Transition Settings",
+    "transition": {      
       "properties": {
-        "show": {
-          "displayName": "Enable Transitions",
+        "show": {          
           "type": {
             "bool": true
           }
         },
-        "transitionType": {
-          "displayName": "Transition Type",
+        "transitionType": {          
           "type": {
             "enumeration": []
           }
         },
-        "transitionDuration": {
-          "displayName": "Transition Duration (ms)",
+        "transitionDuration": {          
           "type": {
             "numeric": true
           }
         }
       }
     },
-    "caption": {
-      "displayName": "Caption Settings",
+    "caption": {      
       "properties": {
-        "show": {
-          "displayName": "Show Caption",
+        "show": {          
           "type": {
             "bool": true
           }
         },
-        "position": {
-          "displayName": "Position",
+        "position": {          
           "type": {
             "enumeration": []
           }
         },
-        "type": {
-          "displayName": "Type",
+        "type": {          
           "type": {
             "enumeration": []
           }
         },
-        "color": {
-          "displayName": "Color",
+        "color": {          
           "type": {
             "fill": {
               "solid": {
@@ -146,59 +132,50 @@
             }
           }
         },
-        "fontFamily": {
-          "displayName": "Font",
+        "fontFamily": {          
           "type": {
             "formatting": {
               "fontFamily": true
             }
           }
         },
-        "fontSize": {
-          "displayName": "Font Size",
+        "fontSize": {          
           "type": {
             "formatting": {
               "fontSize": true
             }
           }
         },
-        "bold": {
-          "displayName": "Bold",
+        "bold": {          
           "type": {
             "bool": true
           }
         },
-        "italic": {
-          "displayName": "Italic",
+        "italic": {          
           "type": {
             "bool": true
           }
         },
-        "underline": {
-          "displayName": "Underline",
+        "underline": {          
           "type": {
             "bool": true
           }
         }
       }
     },
-    "navigation": {
-      "displayName": "Navigation Settings",
+    "navigation": {      
       "properties": {
-        "show": {
-          "displayName": "Show Navigation Dots",
+        "show": {          
           "type": {
             "bool": true
           }
         },
-        "position": {
-          "displayName": "Position",
+        "position": {          
           "type": {
             "enumeration": []
           }
         },
-        "activeDotColor": {
-          "displayName": "Active Dot Color",
+        "activeDotColor": {          
           "type": {
             "fill": {
               "solid": {
@@ -207,14 +184,12 @@
             }
           }
         },
-        "showDotNumbers": {
-          "displayName": "Show Dot Numbers",
+        "showDotNumbers": {          
           "type": {
             "bool": true
           }
         },
-        "dotNumbersColor": {
-          "displayName": "Dot Numbers Color",
+        "dotNumbersColor": {          
           "type": {
             "fill": {
               "solid": {
@@ -225,17 +200,14 @@
         }
       }
     },
-    "general": {
-      "displayName": "General Settings",
+    "general": {      
       "properties": {
-        "imageAlignment": {
-          "displayName": "Image Alignment",
+        "imageAlignment": {          
           "type": {
             "enumeration": []
           }
         },
-        "backgroundColor": {
-          "displayName": "Background Color",
+        "backgroundColor": {          
           "type": {
             "fill": {
               "solid": {

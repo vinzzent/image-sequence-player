@@ -42,8 +42,8 @@ class PlaybackSettingsCard extends FormattingSettingsSimpleCard {
 
     selectionSequence = new formattingSettings.ToggleSwitch({
         name: "selectionSequence",
-        displayName: "Selection Sequence",
-        description: "Enable to apply a filter for each frame during playback.",
+        displayName: "Filter on Play",
+        description: "Filters other visuals automatically during playback.",
         value: false
     });
 

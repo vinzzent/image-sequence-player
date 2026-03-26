@@ -115,6 +115,24 @@ function _createPlaceholderSvg(message: string, textColor: string): string {
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+// === BEGIN CHANGE: Category-only fallback mode ===
+/**
+ * Generates a data URI for an SVG fallback image displaying the slide index.
+ * @param index The slide index number to display.
+ * @param textColor Fill color applied to the text.
+ * @returns A data URI string containing the encoded SVG.
+ */
+function _createFallbackIndexSvg(index: number, textColor: string): string {
+    const textStyle = `font-family:'Segoe UI',sans-serif; font-size:48px; font-weight:bold; fill:${textColor};`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+        <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" style="${textStyle}">
+            ${index}
+        </text>
+    </svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+// === END CHANGE ===
+
 // #endregion
 
 // #Reregion isDataViewValid
@@ -126,16 +144,19 @@ function _createPlaceholderSvg(message: string, textColor: string): string {
  */
 export function isDataViewValid(dataView: DataView): boolean {
     const categorical = dataView && dataView.categorical;
-    if (!categorical || !categorical.categories || !categorical.values) {
+    
+    // === BEGIN CHANGE: Category-only fallback mode ===
+    // Removed requirement for categorical.values as it could be undefined if only Category is used
+    if (!categorical || !categorical.categories) {
         return false;
     }
 
     const sequenceData = categorical.categories.find(c => c.source?.roles?.["category"]);
-    const imageData = categorical.values.find(v => v.source?.roles?.["imageUri"]);
 
-    if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0 || !imageData) {
+    if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0) {
         return false;
     }
+    // === END CHANGE ===
     return true;
 }
 
@@ -150,9 +171,12 @@ export function isDataViewValid(dataView: DataView): boolean {
  * @param host The Power BI visual host used to create selection identities.
  * @param blockExtenalUrls Whether to block external image URLs for security.
  * @param onlyHttps If true, only HTTPS URLs are allowed. If false, HTTP and HTTPS are allowed.
+ * @param colorHelper Utility for dynamically generating colors for fallback SVGs.
  * @returns An array of ImageFrame objects built from the DataView.
  */
-export function transformDataViewToFrames(dataView: DataView, visualSettings: VisualFormattingSettingsModel, host: IVisualHost, blockExtenalUrls: boolean, onlyHttps: boolean): ImageFrame[] {
+// === BEGIN CHANGE: Category-only fallback mode ===
+export function transformDataViewToFrames(dataView: DataView, visualSettings: VisualFormattingSettingsModel, host: IVisualHost, blockExtenalUrls: boolean, onlyHttps: boolean, colorHelper: ColorHelper): ImageFrame[] {
+// === END CHANGE ===
     const categorical = dataView.categorical;
     const categories = categorical?.categories?.find(c => c.source.roles?.["category"]);
     const categoryFormat = categories?.source?.format;
@@ -166,9 +190,14 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
         forValue: valuesData ? valueFormatter.create({ format: valueFormat }) : undefined,
         forTooltips: tooltipFormats.map(f => valueFormatter.create({ format: f }))
     };
-    if (!categories?.values || !imageData?.values) {
+    
+    // === BEGIN CHANGE: Category-only fallback mode ===
+    // Removed dependency on `imageData` so it proceeds if at least `categories` are valid
+    if (!categories?.values) {
         return [];
     }
+    // === END CHANGE ===
+    
     const imageHighlights = imageData?.highlights;
     const isAnyHighlightActive = imageHighlights !== undefined;
     const frames: ImageFrame[] = [];
@@ -215,13 +244,20 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
                 case "category": default: captionText = formattedCategory; break;
             }
         }
+        
+        // === BEGIN CHANGE: Category-only fallback mode ===
+        const imageUri: string | null = imageData 
+            ? _uriSanitizer(imageData.values[i] as string, blockExtenalUrls, onlyHttps)
+            : _createFallbackIndexSvg(i + 1, colorHelper.getHighContrastColor("foreground", colorHelper.getThemeColor("foreground")));        
+        
         const frame: ImageFrame = {
             identity,
-            imageUri: _uriSanitizer(imageData.values[i] as string, blockExtenalUrls, onlyHttps),
+            imageUri: imageUri,
             caption: captionText,
             tooltips: tooltipItems,
             dimmed: dimmed
         };
+        // === END CHANGE ===
         frames.push(frame);
     }
     return frames;

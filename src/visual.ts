@@ -54,7 +54,12 @@ export class Visual implements IVisual {
     private PlayerOrchestrator: PlayerOrchestrator;    
     private tooltipServiceWrapper: ITooltipServiceWrapper;    
     private errorSvgString: string; 
-    private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n and \n [Image] \n fields.";
+    
+    // === BEGIN CHANGE: Category-only fallback mode ===
+    // Updated invalid message since image field is no longer mandatory.
+    private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n field.";
+    // === END CHANGE ===
+    
     private static readonly BLOCK_EXTERNAL_URLS: boolean = false;
     private static readonly ONLY_HTTPS: boolean = true;
 
@@ -106,7 +111,10 @@ export class Visual implements IVisual {
 
         // Get the view model (either real or placeholder)
         if (this.isDataValid) {
-            this.imageFrames = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS, Visual.ONLY_HTTPS);
+            // === BEGIN CHANGE: Category-only fallback mode ===
+            // Passed colorHelper so the fallback SVG can use theme colors dynamically
+            this.imageFrames = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS, Visual.ONLY_HTTPS, this.colorHelper);
+            // === END CHANGE ===
         } else {
             this.imageFrames = createAwaitingDataFrames(Visual.INVALID_MESSAGE, this.colorHelper);
         }

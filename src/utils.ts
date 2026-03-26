@@ -149,9 +149,10 @@ export function isDataViewValid(dataView: DataView): boolean {
  * @param visualSettings Visual formatting settings controlling captions and display.
  * @param host The Power BI visual host used to create selection identities.
  * @param blockExtenalUrls Whether to block external image URLs for security.
+ * @param onlyHttps If true, only HTTPS URLs are allowed. If false, HTTP and HTTPS are allowed.
  * @returns An array of ImageFrame objects built from the DataView.
  */
-export function transformDataViewToFrames(dataView: DataView, visualSettings: VisualFormattingSettingsModel, host: IVisualHost, blockExtenalUrls: boolean): ImageFrame[] {
+export function transformDataViewToFrames(dataView: DataView, visualSettings: VisualFormattingSettingsModel, host: IVisualHost, blockExtenalUrls: boolean, onlyHttps: boolean): ImageFrame[] {
     const categorical = dataView.categorical;
     const categories = categorical?.categories?.find(c => c.source.roles?.["category"]);
     const categoryFormat = categories?.source?.format;
@@ -216,7 +217,7 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
         }
         const frame: ImageFrame = {
             identity,
-            imageUri: _uriSanitizer(imageData.values[i] as string, blockExtenalUrls),
+            imageUri: _uriSanitizer(imageData.values[i] as string, blockExtenalUrls, onlyHttps),
             caption: captionText,
             tooltips: tooltipItems,
             dimmed: dimmed
@@ -230,9 +231,10 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
  * Sanitizes a string as a data URI or external URL based on security policy.
  * @param src The source string to sanitize.
  * @param blockExtenalUrls If true, external URLs are blocked and only data URIs are allowed.
+ * @param onlyHttps If true, only HTTPS URLs are allowed. If false, HTTP and HTTPS are allowed.
  * @returns A sanitized URI string or null if invalid or blocked.
  */
-function _uriSanitizer(src: string, blockExtenalUrls: boolean): string | null {
+function _uriSanitizer(src: string, blockExtenalUrls: boolean, onlyHttps: boolean): string | null {
     if (!src || typeof src !== 'string') {
         return null;
     }
@@ -249,19 +251,23 @@ function _uriSanitizer(src: string, blockExtenalUrls: boolean): string | null {
         // **Strict Mode**: Since it's not a data URI, it's blocked.
         console.warn('External URL blocked');
         return null;
-    } else {
-        // **Flexible Mode**: Attempt to validate the URL.
-        try {
-            const url = new URL(trimmedSrc);
-            // **Sanitization**: Explicitly allow only 'http:' and 'https:' protocols            
-            if (url.protocol === 'http:' || url.protocol === 'https:') {
-                //if (url.protocol === 'https:') {
-                return url.href; // Return the normalized, valid URL.
+    }
+    // External URL allowed → validate protocol
+    try {
+        const url = new URL(trimmedSrc);
+        if (onlyHttps) {
+            if (url.protocol === 'https:') {
+                return url.href;
             }
-            return null; // Reject URLs with other protocols.
-        } catch (error) {
-            return null; // The URL constructor failed, meaning the URL is malformed.
+            console.warn('Blocked non-HTTPS URL:', trimmedSrc);
+            return null;
         }
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+            return url.href;
+        }
+        return null;
+    } catch {
+        return null;
     }
 }
 

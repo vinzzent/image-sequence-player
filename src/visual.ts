@@ -56,6 +56,7 @@ export class Visual implements IVisual {
     private errorSvgString: string; 
     private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n and \n [Image] \n fields.";
     private static readonly BLOCK_EXTERNAL_URLS: boolean = false;
+    private static readonly ONLY_HTTPS: boolean = true;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
@@ -105,7 +106,7 @@ export class Visual implements IVisual {
 
         // Get the view model (either real or placeholder)
         if (this.isDataValid) {
-            this.imageFrames = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS);
+            this.imageFrames = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS, Visual.ONLY_HTTPS);
         } else {
             this.imageFrames = createAwaitingDataFrames(Visual.INVALID_MESSAGE, this.colorHelper);
         }

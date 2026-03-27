@@ -8,8 +8,8 @@ import { VisualFormattingSettingsModel } from "../settings";
 import { FrameRenderer } from "./frame-renderer";
 import { PlayerUIController } from "./player-ui-controller";
 import { ImageFrame } from "../common-interfaces";
-// === BEGIN CHANGE: Import formatIndex ===
-import { formatIndex } from "../utils";
+// === BEGIN CHANGE: Remove formatIndex import ===
+// Removed formatIndex import as formatting is now centralized in transformDataViewToFrames
 // === END CHANGE ===
 import ISelectionId = powerbi.visuals.ISelectionId;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
@@ -234,13 +234,12 @@ export class PlayerOrchestrator {
             this.selectionManager.clear();
             this.selectionManager.select(frame.identity);
         }        
-// === BEGIN CHANGE: Update navigateToFrame to handle formatted index ===
+// === BEGIN CHANGE: Update navigateToFrame to use pre-formatted indexText ===
         const showCaption = this.visualSettings.captionCard.show.value;
         const showDotNumbers = this.visualSettings.navigationCard.dotNumbers.showDotNumbers.value;
         const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
-        const indexType = this.visualSettings.captionCard.indexType.value.value as string;
         
-        const formattedIndex = showCaption ? formatIndex(indexType, this.currentIndex, this.imageFrames.length) : "";
+        const formattedIndex = showCaption ? frame.indexText : "";
 
         const finalDuration = duration ?? (this.visualSettings.transitionCard.show.value
             ? this.visualSettings.transitionCard.transitionDuration.value

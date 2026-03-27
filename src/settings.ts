@@ -109,8 +109,8 @@ class CaptionSettingsCard extends FormattingSettingsSimpleCard {
 
     show = new formattingSettings.ToggleSwitch({
         name: "show",
-        displayName: "Show Labels",
-        value: false
+        displayName: "Show Caption",
+        value: true
     });
 
     position = new formattingSettings.ItemDropdown({

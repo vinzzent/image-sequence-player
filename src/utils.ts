@@ -133,6 +133,7 @@ export function createAwaitingDataFrames(message: string, colorHelper: ColorHelp
         identity: null,
         imageUri: placeholderSvg,
         caption: "Awaiting data",
+        indexText: "",
         tooltips: undefined,
         dimmed: false
     };
@@ -159,20 +160,13 @@ function _createPlaceholderSvg(message: string, textColor: string): string {
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-// === BEGIN CHANGE: Category-only fallback mode ===
+// === BEGIN CHANGE: Replace fallback index SVG with transparent fallback ===
 /**
- * Generates a data URI for an SVG fallback image displaying the slide index.
- * @param index The slide index number to display.
- * @param textColor Fill color applied to the text.
+ * Generates a data URI for a completely transparent 1x1 SVG fallback image.
  * @returns A data URI string containing the encoded SVG.
  */
-function _createFallbackIndexSvg(index: number, textColor: string): string {
-    const textStyle = `font-family:'Segoe UI',sans-serif; font-size:48px; font-weight:bold; fill:${textColor};`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-        <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" style="${textStyle}">
-            ${index}
-        </text>
-    </svg>`;
+function _createTransparentFallbackSvg(): string {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1" fill="transparent"/></svg>`;
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 // === END CHANGE ===
@@ -247,6 +241,9 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
     const frames: ImageFrame[] = [];
     const captionsEnabled = visualSettings.captionCard.show.value;
     const captionType = visualSettings.captionCard.type.value.value as string;
+// === BEGIN CHANGE: Retrieve indexType ===
+    const indexType = visualSettings.captionCard.indexType.value.value as string;
+// === END CHANGE ===
     for (let i = 0; i < categories.values.length; i++) {
         const identity = host.createSelectionIdBuilder()
             .withCategory(categories, i)
@@ -288,15 +285,17 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
         }
 // === END CHANGE ===
         
-        // === BEGIN CHANGE: Category-only fallback mode ===
+        // === BEGIN CHANGE: Set indexText and use transparent fallback SVG ===
+        const indexText = formatIndex(indexType, i, categories.values.length);
         const imageUri: string | null = imageData 
             ? _uriSanitizer(imageData.values[i] as string, blockExtenalUrls, onlyHttps)
-            : _createFallbackIndexSvg(i + 1, colorHelper.getHighContrastColor("foreground", colorHelper.getThemeColor("foreground")));        
+            : _createTransparentFallbackSvg();        
         
         const frame: ImageFrame = {
             identity,
             imageUri: imageUri,
             caption: captionText,
+            indexText: indexText,
             tooltips: tooltipItems,
             dimmed: dimmed
         };

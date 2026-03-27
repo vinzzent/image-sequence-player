@@ -11,6 +11,7 @@ import { ColorHelper } from "powerbi-visuals-utils-colorutils";
 import { VisualFormattingSettingsModel } from "./settings";
 import { ImageFrame } from "./common-interfaces";
 import { PlayerOrchestrator } from "./player/player-orchestrator";
+// === BEGIN CHANGE: Import moveIndex ===
 import {    handleContextMenu,
             buildErrorSvgString,
             isDataViewValid,
@@ -18,8 +19,10 @@ import {    handleContextMenu,
             createAwaitingDataFrames,
             moveLabelContainer,
             moveProgressIndicator,
-            updateStyling
+            updateStyling,
+            moveIndex
         } from "./utils";
+// === END CHANGE ===
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
@@ -89,6 +92,7 @@ export class Visual implements IVisual {
             this.host.tooltipService,
             options.element
         );
+// === BEGIN CHANGE: Passing captionIndex and captionLabel to PlayerOrchestrator ===
         this.PlayerOrchestrator = new PlayerOrchestrator({
             allowInteractions: this.allowInteractions,
             selectionManager: this.selectionManager,
@@ -97,8 +101,11 @@ export class Visual implements IVisual {
             controlsWrapper: this.controlsWrapper,
             progressIndicator: this.progressIndicator,
             imageContainer: this.imageContainer,
-            captionContainer: this.captionContainer
+            captionContainer: this.captionContainer,
+            captionIndex: this.captionIndex,
+            captionLabel: this.captionLabel
         });
+// === END CHANGE ===
     }
 
     /**
@@ -127,10 +134,17 @@ export class Visual implements IVisual {
         this.rootElement.classed("is-invalid", !this.isDataValid);
 
         if (this.isDataValid) {
+// === BEGIN CHANGE: Update Caption DOM position calls ===
             moveLabelContainer(
                 this.visualSettings.captionCard.position.value.value as "top" | "bottom", 
                 this.captionContainer, 
                 this.imageContainer
+            );
+            moveIndex(
+                this.visualSettings.captionCard.indexPosition.value.value as "left" | "right",
+                this.captionContainer,
+                this.captionIndex,
+                this.captionLabel
             );
             moveProgressIndicator(
                 this.visualSettings.navigationCard.generalDotSettings.position.value.value as "top" | "bottom",
@@ -138,6 +152,7 @@ export class Visual implements IVisual {
                 this.progressIndicator,
                 this.contentContainer
             );
+// === END CHANGE ===
             
             updateStyling(this.visualSettings,
                 this.colorHelper,

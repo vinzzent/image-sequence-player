@@ -15,6 +15,50 @@ import DataView = powerbi.DataView;
 
 // #endregion
 
+// === BEGIN CHANGE: Formatter functions for Label and Index ===
+
+/**
+ * Formats the label text based on the selected type.
+ */
+export function formatLabel(type: string, category: string, value: string): string {
+    switch (type) {
+        case "value":
+            return value;
+        case "category_value":
+            return value ? `${category}: ${value}` : category;
+        case "value_category":
+            return category ? `${value} (${category})` : value;
+        case "nothing":
+            return "";
+        case "category":
+        default:
+            return category;
+    }
+}
+
+/**
+ * Formats the index text based on the selected type.
+ */
+export function formatIndex(type: string, currentIndex: number, totalFrames: number): string {
+    const n = currentIndex + 1;
+    switch (type) {
+        case "n_dot":
+            return `${n}.`;
+        case "hash_n":
+            return `#${n}`;
+        case "parenthesis_n":
+            return `(${n})`;
+        case "n_of_N":
+            return `${n}/${totalFrames}`;
+        case "nothing":
+            return "";
+        case "n":
+        default:
+            return `${n}`;
+    }
+}
+// === END CHANGE ===
+
 // #region handleContextMenu
 
 /**
@@ -237,13 +281,12 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
                 tooltipItems.push({ displayName: measure.source.displayName, value: formattedMeasure });
             }
         });
+        
+// === BEGIN CHANGE: Use formatLabel ===
         if (captionsEnabled) {
-            switch (captionType) {
-                case "value": captionText = formattedValue; break;
-                case "category_value": captionText = formattedValue ? `${formattedCategory}: ${formattedValue}` : formattedCategory; break;
-                case "category": default: captionText = formattedCategory; break;
-            }
+            captionText = formatLabel(captionType, formattedCategory, formattedValue);
         }
+// === END CHANGE ===
         
         // === BEGIN CHANGE: Category-only fallback mode ===
         const imageUri: string | null = imageData 

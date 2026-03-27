@@ -80,6 +80,10 @@
         font-size: var(--caption-font-size, 12pt);
         color: var(--caption-color, #333333);
 
+        span:not(:empty) + span:not(:empty) {
+            margin-left: 6px;
+        }
+
         // Class-based styles
         &.is-bold {
             font-weight: bold;

@@ -28,11 +28,29 @@ const imageAlignmentOptions: powerbi.IEnumMember[] = [
     { value: "scale-down", displayName: "Center" }
 ];
 
+// === BEGIN CHANGE: Caption Settings Options ===
 const captionTypeOptions: powerbi.IEnumMember[] = [
     { value: "category", displayName: "Category" },
     { value: "value", displayName: "Value" },
-    { value: "category_value", displayName: "Category: Value" }
+    { value: "category_value", displayName: "Category: Value" },
+    { value: "value_category", displayName: "Value (Category)" },
+    { value: "nothing", displayName: "Nothing" }
 ];
+
+const indexTypeOptions: powerbi.IEnumMember[] = [
+    { value: "n", displayName: "n" },
+    { value: "n_dot", displayName: "n." },
+    { value: "hash_n", displayName: "#n" },
+    { value: "parenthesis_n", displayName: "(n)" },
+    { value: "n_of_N", displayName: "n/N" },
+    { value: "nothing", displayName: "Nothing" }
+];
+
+const indexPositionOptions: powerbi.IEnumMember[] = [
+    { value: "left", displayName: "Left" },
+    { value: "right", displayName: "Right" }
+];
+// === END CHANGE ===
 
 // --- Define Formatting Cards ---
 
@@ -84,6 +102,7 @@ class TransitionSettingsCard extends FormattingSettingsSimpleCard {
     slices: FormattingSettingsSlice[] = [this.transitionType, this.transitionDuration];
 }
 
+// === BEGIN CHANGE: CaptionSettingsCard Updates ===
 class CaptionSettingsCard extends FormattingSettingsSimpleCard {
     name: string = "caption";
     displayName: string = "Caption Settings";
@@ -96,16 +115,30 @@ class CaptionSettingsCard extends FormattingSettingsSimpleCard {
 
     position = new formattingSettings.ItemDropdown({
         name: "position",
-        displayName: "Position",
+        displayName: "Caption Position",
         items: positionOptions,
         value: positionOptions[0] // Default to Top
     });
 
     type = new formattingSettings.ItemDropdown({
         name: "type",
-        displayName: "Type",
+        displayName: "Label Type",
         items: captionTypeOptions,
         value: captionTypeOptions[0] // Default to Category
+    });
+
+    indexType = new formattingSettings.ItemDropdown({
+        name: "indexType",
+        displayName: "Index Type",
+        items: indexTypeOptions,
+        value: indexTypeOptions[0] // Default to n
+    });
+
+    indexPosition = new formattingSettings.ItemDropdown({
+        name: "indexPosition",
+        displayName: "Index Position",
+        items: indexPositionOptions,
+        value: indexPositionOptions[0] // Default to left
     });
 
     color = new formattingSettings.ColorPicker({
@@ -131,8 +164,9 @@ class CaptionSettingsCard extends FormattingSettingsSimpleCard {
     });
 
     topLevelSlice: formattingSettings.ToggleSwitch = this.show;
-    slices: FormattingSettingsSlice[] = [this.position, this.type, this.color, this.font];
+    slices: FormattingSettingsSlice[] = [this.position, this.type, this.indexType, this.indexPosition, this.color, this.font];
 }
+// === END CHANGE ===
 
 class DotNumbersGroup extends FormattingSettingsSimpleCard {
     name: string = "dotNumbers";

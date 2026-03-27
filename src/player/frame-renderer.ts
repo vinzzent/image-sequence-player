@@ -29,14 +29,18 @@ export class FrameRenderer {
     private imageCache: Map<string, HTMLImageElement> = new Map();
     private readonly maxCacheEntries: number = 10;
 
+// === BEGIN CHANGE: Update FrameRenderer constructor to receive index/label span selections ===
     constructor(
         private imageContainer: Selection<HTMLDivElement, any, any, any>,
         private captionContainer: Selection<HTMLDivElement, any, any, any>,
+        private captionIndex: Selection<HTMLSpanElement, any, any, any>,
+        private captionLabel: Selection<HTMLSpanElement, any, any, any>,
         private progressIndicator: Selection<HTMLDivElement, any, any, any>,
         private tooltipServiceWrapper: ITooltipServiceWrapper,
         private errorSvgString: string,
         private onSelect: (identity: ISelectionId) => void,
     ) { }
+// === END CHANGE ===
 
     /**
  * Renders a specific frame.
@@ -47,7 +51,10 @@ export class FrameRenderer {
  * @param transitionDuration The duration of the transition in milliseconds.
  * @param transitionType The type of transition (e.g., "slideHorizontal").
  * @param showCaption Whether to display the caption text.
+ * @param showDotNumbers Whether to show the number of frames.
+ * @param formattedIndex Format the text index string to be outputted.
  */
+// === BEGIN CHANGE: Add formattedIndex to renderFrame signature ===
     public async renderFrame(
         frame: ImageFrame,
         allFrames: ImageFrame[],
@@ -56,24 +63,29 @@ export class FrameRenderer {
         transitionDuration: number,
         transitionType: string,
         showCaption: boolean,
-        showDotNumbers: boolean
+        showDotNumbers: boolean,
+        formattedIndex: string
     ): Promise<void> {
         // Now calls the updated updateCaption method
-        this.updateCaption(frame.caption, showCaption);
+        this.updateCaption(frame.caption, showCaption, formattedIndex);
         this.updateProgressDots(allFrames, currentIndex, showDotNumbers);
         this.bindTooltips(frame, allFrames);
         this.imageContainer.on("click", () => this.onSelect(frame.identity));
         await this.applyD3Transition(frame, transitionDuration, transitionType, isForward);
     }
+// === END CHANGE ===
 
     /**
      * Clears all visual elements from the containers.
      */
+// === BEGIN CHANGE: Clear spans gracefully to not destroy inner node structure ===
     public clearContainers() {
         this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
-        this.captionContainer.text("");
+        this.captionIndex.text("");
+        this.captionLabel.text("");
         this.progressIndicator.selectAll<HTMLButtonElement, any>(".dot").remove();
     }
+// === END CHANGE ===
 
     /**
     * Clears image container.
@@ -99,11 +111,16 @@ export class FrameRenderer {
      * Updates the caption text container.
      * @param caption The text of the caption.
      * @param showCaption A boolean to determine if the caption should be visible.
+     * @param formattedIndex The generated text indicating index string.
      */
-    private updateCaption(caption: string, showCaption: boolean): void {
+// === BEGIN CHANGE: Update updateCaption to output into the respective spans ===
+    private updateCaption(caption: string, showCaption: boolean, formattedIndex: string): void {
         const newCaption = showCaption ? caption : "";
-        this.captionContainer.text(newCaption);
+        const newIndex = showCaption ? formattedIndex : "";
+        this.captionLabel.text(newCaption);
+        this.captionIndex.text(newIndex);
     }
+// === END CHANGE ===
 
     /**
     * Updates progress dots, highlighting the current frame and optionally showing numbers. 
@@ -178,11 +195,19 @@ export class FrameRenderer {
             .selectAll<HTMLImageElement, any>("img.exiting-image")
             .remove();
 
+// === BEGIN CHANGE: Invert horizontal slide transition ===
         // 1. Set up clear, reusable constants
         const axis = type === "slideHorizontal" ? "X" : "Y";
         const isSlide = type === "slideHorizontal" || type === "slideVertical";
-        const startValue = isForward ? 100 : -100;
+        
+        // Invert direction for slideHorizontal: moving right-to-left -> left-to-right or vice versa
+        // If type is slideHorizontal, we invert the startValue logic compared to Y.
+        const startValue = type === "slideHorizontal" 
+            ? (isForward ? -100 : 100) 
+            : (isForward ? 100 : -100);
+            
         const endValue = -startValue;
+// === END CHANGE ===
 
         // 2. Data binding with original key function (including fallback)
         const images = this.imageContainer

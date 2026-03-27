@@ -8,9 +8,13 @@ import { VisualFormattingSettingsModel } from "../settings";
 import { FrameRenderer } from "./frame-renderer";
 import { PlayerUIController } from "./player-ui-controller";
 import { ImageFrame } from "../common-interfaces";
+// === BEGIN CHANGE: Import formatIndex ===
+import { formatIndex } from "../utils";
+// === END CHANGE ===
 import ISelectionId = powerbi.visuals.ISelectionId;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 
+// === BEGIN CHANGE: Add caption elements to RenderedOptions ===
 interface RenderedOptions {
     allowInteractions: boolean;     
     selectionManager: ISelectionManager;
@@ -20,7 +24,10 @@ interface RenderedOptions {
     progressIndicator: d3Selection<HTMLDivElement, any, any, any>;
     imageContainer: d3Selection<HTMLDivElement, any, any, any>;
     captionContainer: d3Selection<HTMLDivElement, any, any, any>;        
+    captionIndex: d3Selection<HTMLSpanElement, any, any, any>;
+    captionLabel: d3Selection<HTMLSpanElement, any, any, any>;
 }
+// === END CHANGE ===
 
 enum PlayerState {
     Idle,
@@ -63,14 +70,18 @@ export class PlayerOrchestrator {
             this.togglePlayback.bind(this)
         );
 
+// === BEGIN CHANGE: Pass captionIndex and captionLabel to FrameRenderer ===
         this.frameManager = new FrameRenderer(
             options.imageContainer,
             options.captionContainer,
+            options.captionIndex,
+            options.captionLabel,
             options.progressIndicator,            
             options.tooltipServiceWrapper,
             options.errorSvgString,
             this.selectFrameById.bind(this)
         );
+// === END CHANGE ===
 
         this.spinnerElement = options.imageContainer.append("div").classed("spinner", true);
         this.setupSpinner();
@@ -223,9 +234,14 @@ export class PlayerOrchestrator {
             this.selectionManager.clear();
             this.selectionManager.select(frame.identity);
         }        
+// === BEGIN CHANGE: Update navigateToFrame to handle formatted index ===
         const showCaption = this.visualSettings.captionCard.show.value;
         const showDotNumbers = this.visualSettings.navigationCard.dotNumbers.showDotNumbers.value;
         const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
+        const indexType = this.visualSettings.captionCard.indexType.value.value as string;
+        
+        const formattedIndex = showCaption ? formatIndex(indexType, this.currentIndex, this.imageFrames.length) : "";
+
         const finalDuration = duration ?? (this.visualSettings.transitionCard.show.value
             ? this.visualSettings.transitionCard.transitionDuration.value
             : 0);
@@ -238,7 +254,8 @@ export class PlayerOrchestrator {
                 finalDuration,
                 transitionType,
                 showCaption,
-                showDotNumbers
+                showDotNumbers,
+                formattedIndex
             );
         } catch (error) {
             console.error(`Error navigating to frame ${this.currentIndex}:`, error);
@@ -247,6 +264,7 @@ export class PlayerOrchestrator {
                 this.playerState = (previousState === PlayerState.Playing) ? PlayerState.Playing : PlayerState.Paused;
             }
         }
+// === END CHANGE ===
     }
 
     /**

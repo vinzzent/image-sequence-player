@@ -123,6 +123,16 @@
             "enumeration": []
           }
         },
+        "indexType": {          
+          "type": {
+            "enumeration": []
+          }
+        },
+        "indexPosition": {          
+          "type": {
+            "enumeration": []
+          }
+        },
         "color": {          
           "type": {
             "fill": {

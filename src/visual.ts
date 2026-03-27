@@ -48,6 +48,8 @@ export class Visual implements IVisual {
     private contentContainer: d3Selection<HTMLDivElement, any, any, any>;
     private imageContainer: d3Selection<HTMLDivElement, any, any, any>;
     private captionContainer: d3Selection<HTMLDivElement, any, any, any>;
+    private captionIndex: d3Selection<HTMLSpanElement, any, any, any>;
+    private captionLabel: d3Selection<HTMLSpanElement, any, any, any>;
     private controlsWrapper: d3Selection<HTMLDivElement, any, any, any>;
     private progressIndicator: d3Selection<HTMLDivElement, any, any, any>;
     private isDataValid: boolean = false;
@@ -75,6 +77,8 @@ export class Visual implements IVisual {
         this.rootElement = d3Select(this.target).append("div").classed("image-sequence-player", true).classed("highcontrast", this.colorHelper.isHighContrast);
         this.contentContainer = this.rootElement.append("div").classed("content-container", true);
         this.captionContainer = this.contentContainer.append("div").classed("caption-container", true);
+        this.captionIndex = this.captionContainer.append("span").classed("caption-index", true);
+        this.captionLabel = this.captionContainer.append("span").classed("caption-label", true);
         this.imageContainer = this.contentContainer.append("div").classed("image-container", true);
         this.progressIndicator = this.rootElement.append("div").classed("progress-indicator", true);
         this.controlsWrapper = this.rootElement.append("div").classed("controls-wrapper", true);

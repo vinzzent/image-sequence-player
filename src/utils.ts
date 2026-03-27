@@ -396,6 +396,30 @@ export function moveProgressIndicator(position: "top" | "bottom",
 
 // #endregion
 
+// #region moveIndex
+
+/**
+ * Moves the index span to the left or right of the label inside the caption container.
+ * @param position "left" to place before, "right" to place after the label.
+ * @param captionContainer The D3 selection of the caption container.
+ * @param captionIndex The D3 selection of the index span to move.
+ * @param captionLabel The D3 selection of the label span used as reference.
+ */
+export function moveIndex(
+    position: "left" | "right",
+    captionContainer: d3Selection<HTMLDivElement, any, any, any>,
+    captionIndex: d3Selection<HTMLSpanElement, any, any, any>,
+    captionLabel: d3Selection<HTMLSpanElement, any, any, any>
+) {
+    if (position === "left") {
+        captionContainer.node()?.insertBefore(captionIndex.node()!, captionLabel.node());
+    } else {
+        captionContainer.node()?.insertBefore(captionIndex.node()!, captionLabel.node()?.nextSibling || null);
+    }
+}
+
+// #endregion
+
 // #region updateStyling
 
 /**

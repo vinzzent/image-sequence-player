@@ -15,7 +15,7 @@
         "email": "vvborries@gmail.com"
     },
     "assets": {
-        "icon": "assets/icon.png"
+        "icon": "assets/icon32x32.png"
     },
     "externalJS": [],
     "style": "style/visual.less",

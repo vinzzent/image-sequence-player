@@ -130,6 +130,12 @@ export class FrameRenderer {
     */
     private updateProgressDots(allFrames: ImageFrame[], currentIndex: number, showDotNumbers: boolean): void {
         const dots = this.progressIndicator.selectAll<HTMLButtonElement, ImageFrame>(".dot").data(allFrames);
+        
+        // --- START OF CHANGE ---
+        // Purge leftover DOM elements when dataset shrinks (e.g. from filtering)
+        dots.exit().remove();
+        // --- END OF CHANGE ---
+
         dots.enter().append("button").classed("dot", true)
             .on("click", (event, d) => this.onSelect(d.identity))
             .merge(dots)

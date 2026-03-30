@@ -139,6 +139,14 @@ export class PlayerOrchestrator {
         // Sets its own state and notifies the UI
         this.playerState = PlayerState.Playing;
         this.playerUI.updatePlayPauseIcon(true);
+
+// === BEGIN CHANGE: Apply initial playback filter ===
+        if (this.visualSettings.playbackCard.selectionSequence.value) {
+            this.selectionManager.clear();
+            this.selectionManager.select(this.imageFrames[this.currentIndex].identity);
+        }
+// === END CHANGE ===
+
         this.playbackLoop();
     }
 

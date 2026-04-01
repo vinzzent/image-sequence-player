@@ -93,9 +93,12 @@ export function buildErrorSvgString(colorHelper: ColorHelper): string {
     const strokeColor = colorHelper.getHighContrastColor("foreground", colorHelper.getThemeColor("foreground"));
     const strokeWidth = colorHelper.isHighContrast ? 0.2 : 0;
     const opacity = 0.4;
+    const scale = 0.7;
+    const center = 10.4;
+    const transform = `translate(${center} ${center}) scale(${scale}) translate(-${center} -${center})`;
 
     return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 20.8 20.8">
-        <g opacity="${opacity}">
+        <g opacity="${opacity}" transform="${transform}">
             <path d="m20 20.8.8-.8L.8 0 0 .8Z" 
                 fill="${fillColor}" 
                 stroke="${strokeColor}" 

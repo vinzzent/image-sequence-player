@@ -38,6 +38,11 @@ import "./../style/visual.less";
 // ===================================================================
 
 export class Visual implements IVisual {
+    // --- Freemium Licensing Directives ---
+    private static readonly FREE_VERSION_MAX_FRAMES: number = 15;
+    private static readonly MOCK_PRO_LICENSE: boolean = false;
+    private isProLicense: boolean = false;
+
     private host: IVisualHost;
     private events: IVisualEventService;
     private colorHelper: ColorHelper;    
@@ -106,6 +111,23 @@ export class Visual implements IVisual {
             captionLabel: this.captionLabel
         });
 // === END CHANGE ===
+
+        // --- Freemium License Verification ---
+        // Validate user's available plans. If an Active plan is found, enable Pro mode.
+        this.host.licenseManager.getAvailableServicePlans()
+            .then((result) => {
+                if (result && result.plans) {
+                    const hasActivePlan = result.plans.some(
+                        (plan) => plan.state === powerbi.ServicePlanState.Active
+                    );
+                    if (hasActivePlan) {
+                        this.isProLicense = true;
+                    }
+                }
+            })
+            .catch((err) => {
+                console.warn("Failed to fetch license availability", err);
+            });
     }
 
     /**
@@ -126,6 +148,19 @@ export class Visual implements IVisual {
             // Passed colorHelper so the fallback SVG can use theme colors dynamically
             this.imageFrames = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS, Visual.ONLY_HTTPS, this.colorHelper);
             // === END CHANGE ===
+
+            // --- Applying the Freemium Limit ---
+            // If the user isn't holding a valid Pro License, mock is off, and frames exceed the Free limit
+            if (!this.isProLicense && !Visual.MOCK_PRO_LICENSE && this.imageFrames.length > Visual.FREE_VERSION_MAX_FRAMES) {
+                // Keep only the first 15 images
+                this.imageFrames = this.imageFrames.slice(0, Visual.FREE_VERSION_MAX_FRAMES);
+                
+                // Display the native UI warning message block
+                this.host.displayWarningIcon(
+                    "Free Version Limit", 
+                    `Category limit reached (${Visual.FREE_VERSION_MAX_FRAMES} max). Upgrade to Pro for up to 30,000 categories.`
+                );
+            }
         } else {
             this.imageFrames = createAwaitingDataFrames(Visual.INVALID_MESSAGE, this.colorHelper);
         }

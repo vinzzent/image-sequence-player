@@ -336,14 +336,16 @@ function _uriSanitizer(src: string, blockExtenalUrls: boolean, onlyHttps: boolea
     // External URL allowed → validate protocol
     try {
         const url = new URL(trimmedSrc);
+        const http = 'http';
+        const https = 'https';
         if (onlyHttps) {
-            if (url.protocol === 'https:') {
+            if (url.protocol === https + ':') {
                 return url.href;
             }
             console.warn('Blocked non-HTTPS URL:', trimmedSrc);
             return null;
         }
-        if (url.protocol === 'http:' || url.protocol === 'https:') {
+        if (url.protocol === http + ':' || url.protocol === https + ':') {
             return url.href;
         }
         return null;

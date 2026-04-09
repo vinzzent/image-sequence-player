@@ -8,7 +8,7 @@
 				"file": "resources/imageSequencePlayerA23B3A115A194CE09E379B7C5697A383.pbiviz.json"
 			}
 		],
-		"visual": {"name":"imageSequencePlayer","displayName":"ImageSequencePlayer","guid":"imageSequencePlayerA23B3A115A194CE09E379B7C5697A383","visualClassName":"Visual","version":"1.0.0.0","description":"Displays image/SVG sequences with play, pause, step, and looping controls inside Power BI.","supportUrl":"www.vincentborries.com","gitHubUrl":""},
+		"visual": {"name":"imageSequencePlayer","displayName":"Image Sequence Player","guid":"imageSequencePlayerA23B3A115A194CE09E379B7C5697A383","visualClassName":"Visual","version":"1.0.0.0","description":"Displays image/SVG sequences with play, pause, step, and looping controls inside Power BI.","supportUrl":"https://github.com/vinzzent/concacore/image-player#support","gitHubUrl":"https://github.com/vinzzent/image-sequence-player"},
 		"metadata": {
 			"pbivizjson": {
 				"resourceId": "rId0"

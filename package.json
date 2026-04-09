@@ -1,22 +1,21 @@
 {
   "name": "visual",
   "description": "default_template_value",
-  "version": "1.0.0.0",
+  "version": "1.0.0",
   "repository": {
-    "type": "default_template_value",
-    "url": "default_template_value"
+    "type": "git",
+    "url": "https://github.com/vinzzent/image-sequence-player"
   },
   "license": "MIT",
   "scripts": {
     "pbiviz": "pbiviz",
     "start": "pbiviz start",
     "package": "pbiviz package",
-    "lint": "npx eslint ."
+    "lint": "eslint ."
   },
   "dependencies": {
     "@types/d3": "7.4.3",
     "d3": "7.9.0",
-    "powerbi-visuals-api": "~5.3.0",
     "powerbi-visuals-utils-colorutils": "6.0.5",
     "powerbi-visuals-utils-formattingmodel": "6.0.4",
     "powerbi-visuals-utils-formattingutils": "6.1.2",
@@ -26,7 +25,8 @@
     "@typescript-eslint/eslint-plugin": "8.8.0",
     "eslint": "9.11.1",
     "eslint-plugin-powerbi-visuals": "1.0.0",
-    "powerbi-visuals-tools": "5.3.0",
+    "powerbi-visuals-api": "5.11.0",
+    "powerbi-visuals-tools": "7.0.3",
     "typescript": "5.5.4"
   }
 }

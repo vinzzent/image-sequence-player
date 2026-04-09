@@ -71,7 +71,7 @@ export class Visual implements IVisual {
     // === END CHANGE ===
     
     private static readonly BLOCK_EXTERNAL_URLS: boolean = false;
-    private static readonly ONLY_HTTPS: boolean = true;
+    private static readonly ONLY_HTTPS: boolean = false;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;

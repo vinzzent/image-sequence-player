@@ -1,5 +1,7 @@
 # Image Sequence Player – Usage Guide
 
+![Image Sequence Player Icon](./assets/icon300x300.png)
+
 ## Summary
 - [Image Sequence Player – Usage Guide](#image-sequence-player--usage-guide)
   - [Summary](#summary)
@@ -94,12 +96,12 @@ The visual can be customized using the Format pane:
 
 ## Typical Use Cases
 
-* Viewing time-lapse photography or satellite imagery linked to a date field.
-* Stepping through process documentation, user guides, or assembly instructions.
-* Automatically rotating through top-performing products or staff members on a digital signage dashboard.
+* Visualizing time-based sequences such as progress over time, version evolution, or periodic snapshots linked to a date or ordered field.
+* Stepping through processes, instructions, or workflows where each frame represents a clear stage or step.
+* Showcasing collections like products, designs, or highlights in a controlled, slideshow-style experience for dashboards or presentations.
 
 ## Notes
 
 * **Free Tier Limit:** The free version of the visual limits rendering to a maximum of 15 categories (frames). Users exceeding this limit will see a warning message and only the first 15 frames will be displayed. A Pro license expands this capacity.
-* **URL Restrictions:** The visual renders both standard `HTTP` and secure `HTTPS` external image URLs, as well as self-contained base64 Data URIs.
+* **Image sources:** The visual renders both standard `HTTP` and secure `HTTPS` external image URLs, as well as self-contained base64 Data URIs.
 * **Caching:** Only the most recently used 10 images are stored in the memory cache at any time to prevent performance degradation.

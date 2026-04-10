@@ -1,24 +1,24 @@
 id,product,category,price,rating,brand,discount,rating_count,sales_app,sales_website,sales_affiliates,total_sales,image_url
-1,Ultra Wireless Headphones,Audio,299.00,4.8,SoundMaster,0.10,1250,550,420,180,1150,https://github.com/vinzzent/image-sequence-player/samples/images/p_1_ultra_wireless_headphones.jpg
-2,Smart Fitness Watch,Accessories,199.00,4.5,BioTech,0.05,850,980,610,320,1910,https://github.com/vinzzent/image-sequence-player/samples/images/p_2_smart_fitness_watch.jpg
-3,Electronic Camera Series 1,Electronics,1200.00,3.9,OpticView,0.00,430,120,210,50,380,https://github.com/vinzzent/image-sequence-player/samples/images/p_3_electronic_camera_series_1.jpg
-4,Deluxe Desk Telephone,Home & Decor,85.00,4.6,Lumina,0.20,112,220,180,90,490,https://github.com/vinzzent/image-sequence-player/samples/images/p_4_deluxe_desk_telephone.jpg
-5,Classic Leather Backpack,Accessories,120.00,4.7,UrbanGear,0.10,540,630,350,210,1190,https://github.com/vinzzent/image-sequence-player/samples/images/p_5_classic_leather_backpack.jpg
-6,Mechanical RGB Keyboard,Peripherals,150.00,3.4,ClickPro,0.00,215,310,290,120,720,https://github.com/vinzzent/image-sequence-player/samples/images/p_6_broken_link
-7,Precision Gaming Mouse,Peripherals,79.00,4.3,SwiftMove,0.05,180,450,320,160,930,https://github.com/vinzzent/image-sequence-player/samples/images/p_7_precision_gaming_mouse.jpg
-8,Portable Bluetooth Speaker,Audio,59.00,4.1,SonicWave,0.25,1500,1100,850,520,2470,https://github.com/vinzzent/image-sequence-player/samples/images/p_8_portable_bluetooth_speaker.jpg
-9,Modern Glass Coffee Pot,Kitchen,45.00,4.5,BrewArt,0.10,64,85,130,40,255,https://github.com/vinzzent/image-sequence-player/samples/images/p_9_modern_glass_coffee_pot.jpg
-10,Premium Leather Wallet,Fashion,65.00,3.7,Vault,0.00,890,920,550,310,1780,https://github.com/vinzzent/image-sequence-player/samples/images/p_10_premium_leather_wallet.jpg
-11,Natural Wood Sunglasses,Fashion,89.00,4.2,EcoVision,0.15,450,510,380,220,1110,https://github.com/vinzzent/image-sequence-player/samples/images/p_11_natural_wood_sunglasses.jpg
-12,Professional Studio Mic,Audio,250.00,4.2,VoiceCore,0.00,312,140,195,65,400,https://github.com/vinzzent/image-sequence-player/samples/images/p_12_professional_studio_mic.jpg
-13,Compact Drone 4K,Electronics,899.00,3.6,SkyHigh,0.05,88,60,95,30,185,https://github.com/vinzzent/image-sequence-player/samples/images/p_13_compact_drone_4k.jpg
-14,Industrial Wall Clock,Home & Decor,55.00,4.0,TimeCo,0.10,230,150,210,80,440,https://github.com/vinzzent/image-sequence-player/samples/images/p_14_industrial_wall_clock.jpg
-15,Electric Espresso Machine,Kitchen,320.00,4.7,CaffeineX,0.12,540,320,410,150,880,https://github.com/vinzzent/image-sequence-player/samples/images/p_15_electric_espresso_machine.jpg
-16,Designer Table Lamp,Home & Decor,110.00,4.3,Aura,0.20,670,410,390,180,980,https://github.com/vinzzent/image-sequence-player/samples/images/p_16_designer_table_lamp.jpg
-17,Ceramic Minimalist Vase,Home & Decor,29.00,4.6,PureForm,0.00,420,310,290,150,750,https://github.com/vinzzent/image-sequence-player/samples/images/p_17_ceramic_minimalist_vase.jpg
-18,Cotton Canvas Tote,Fashion,25.00,4.1,EarthKind,0.10,890,980,620,410,2010,https://github.com/vinzzent/image-sequence-player/samples/images/p_18_broken_link
-19,Stylish Eco-Friendly Bag,Accessories,95.00,4.4,MetroGear,0.20,560,420,390,180,990,https://github.com/vinzzent/image-sequence-player/samples/images/p_19_stylish_eco_friendly_bag.jpg
-20,Studio Monitor Speaker,Audio,450.00,3.8,ProSound,0.10,89,75,110,35,220,https://github.com/vinzzent/image-sequence-player/samples/images/p_20_studio_monitor_speaker.jpg
-21,Modernist Coffee Table,Home & Decor,210.00,4.6,VistaHome,0.00,145,130,190,60,380,https://github.com/vinzzent/image-sequence-player/samples/images/p_21_modernist_coffee_table.jpg
-22,Smart Sensor,Electronics,12.00,3.7,OpenSense,0.00,2100,600,900,300,1800,https://github.com/vinzzent/image-sequence-player/samples/images/p_22_smart_sensor.jpg
-23,Coding Robot,Electronics,55.00,4.5,EduBot,0.00,320,100,150,50,300,https://github.com/vinzzent/image-sequence-player/samples/images/p_23_coding_robot.jpg
+1,Ultra Wireless Headphones,Audio,299.00,4.8,SoundMaster,0.10,1250,550,420,180,1150,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_1_ultra_wireless_headphones.jpg
+2,Smart Fitness Watch,Accessories,199.00,4.5,BioTech,0.05,850,980,610,320,1910,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_2_smart_fitness_watch.jpg
+3,Electronic Camera Series 1,Electronics,1200.00,3.9,OpticView,0.00,430,120,210,50,380,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_3_electronic_camera_series_1.jpg
+4,Deluxe Desk Telephone,Home & Decor,85.00,4.6,Lumina,0.20,112,220,180,90,490,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_4_deluxe_desk_telephone.jpg
+5,Classic Leather Backpack,Accessories,120.00,4.7,UrbanGear,0.10,540,630,350,210,1190,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_5_classic_leather_backpack.jpg
+6,Mechanical RGB Keyboard,Peripherals,150.00,3.4,ClickPro,0.00,215,310,290,120,720,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_6_broken_link
+7,Precision Gaming Mouse,Peripherals,79.00,4.3,SwiftMove,0.05,180,450,320,160,930,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_7_precision_gaming_mouse.jpg
+8,Portable Bluetooth Speaker,Audio,59.00,4.1,SonicWave,0.25,1500,1100,850,520,2470,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_8_portable_bluetooth_speaker.jpg
+9,Modern Glass Coffee Pot,Kitchen,45.00,4.5,BrewArt,0.10,64,85,130,40,255,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_9_modern_glass_coffee_pot.jpg
+10,Premium Leather Wallet,Fashion,65.00,3.7,Vault,0.00,890,920,550,310,1780,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_10_premium_leather_wallet.jpg
+11,Natural Wood Sunglasses,Fashion,89.00,4.2,EcoVision,0.15,450,510,380,220,1110,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_11_natural_wood_sunglasses.jpg
+12,Professional Studio Mic,Audio,250.00,4.2,VoiceCore,0.00,312,140,195,65,400,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_12_professional_studio_mic.jpg
+13,Compact Drone 4K,Electronics,899.00,3.6,SkyHigh,0.05,88,60,95,30,185,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_13_compact_drone_4k.jpg
+14,Industrial Wall Clock,Home & Decor,55.00,4.0,TimeCo,0.10,230,150,210,80,440,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_14_industrial_wall_clock.jpg
+15,Electric Espresso Machine,Kitchen,320.00,4.7,CaffeineX,0.12,540,320,410,150,880,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_15_electric_espresso_machine.jpg
+16,Designer Table Lamp,Home & Decor,110.00,4.3,Aura,0.20,670,410,390,180,980,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_16_designer_table_lamp.jpg
+17,Ceramic Minimalist Vase,Home & Decor,29.00,4.6,PureForm,0.00,420,310,290,150,750,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_17_ceramic_minimalist_vase.jpg
+18,Cotton Canvas Tote,Fashion,25.00,4.1,EarthKind,0.10,890,980,620,410,2010,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_18_broken_link
+19,Stylish Eco-Friendly Bag,Accessories,95.00,4.4,MetroGear,0.20,560,420,390,180,990,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_19_stylish_eco_friendly_bag.jpg
+20,Studio Monitor Speaker,Audio,450.00,3.8,ProSound,0.10,89,75,110,35,220,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_20_studio_monitor_speaker.jpg
+21,Modernist Coffee Table,Home & Decor,210.00,4.6,VistaHome,0.00,145,130,190,60,380,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_21_modernist_coffee_table.jpg
+22,Smart Sensor,Electronics,12.00,3.7,OpenSense,0.00,2100,600,900,300,1800,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_22_smart_sensor.jpg
+23,Coding Robot,Electronics,55.00,4.5,EduBot,0.00,320,100,150,50,300,https://raw.githubusercontent.com/vinzzent/image-sequence-player/refactor/granular-classes/samples/images/p_23_coding_robot.jpg

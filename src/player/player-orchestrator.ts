@@ -8,13 +8,10 @@ import { VisualFormattingSettingsModel } from "../settings";
 import { FrameRenderer } from "./frame-renderer";
 import { PlayerUIController } from "./player-ui-controller";
 import { ImageFrame } from "../common-interfaces";
-// === BEGIN CHANGE: Remove formatIndex import ===
 // Removed formatIndex import as formatting is now centralized in transformDataViewToFrames
-// === END CHANGE ===
 import ISelectionId = powerbi.visuals.ISelectionId;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 
-// === BEGIN CHANGE: Add caption elements to RenderedOptions ===
 interface RenderedOptions {
     allowInteractions: boolean;     
     selectionManager: ISelectionManager;
@@ -27,7 +24,6 @@ interface RenderedOptions {
     captionIndex: d3Selection<HTMLSpanElement, any, any, any>;
     captionLabel: d3Selection<HTMLSpanElement, any, any, any>;
 }
-// === END CHANGE ===
 
 enum PlayerState {
     Idle,
@@ -70,7 +66,6 @@ export class PlayerOrchestrator {
             this.togglePlayback.bind(this)
         );
 
-// === BEGIN CHANGE: Pass captionIndex and captionLabel to FrameRenderer ===
         this.frameManager = new FrameRenderer(
             options.imageContainer,
             options.captionContainer,
@@ -81,7 +76,6 @@ export class PlayerOrchestrator {
             options.errorSvgString,
             this.selectFrameById.bind(this)
         );
-// === END CHANGE ===
 
         this.spinnerElement = options.imageContainer.append("div").classed("spinner", true);
         this.setupSpinner();
@@ -140,12 +134,10 @@ export class PlayerOrchestrator {
         this.playerState = PlayerState.Playing;
         this.playerUI.updatePlayPauseIcon(true);
 
-// === BEGIN CHANGE: Apply initial playback filter ===
         if (this.visualSettings.playbackCard.selectionSequence.value) {
             this.selectionManager.clear();
             this.selectionManager.select(this.imageFrames[this.currentIndex].identity);
         }
-// === END CHANGE ===
 
         this.playbackLoop();
     }
@@ -241,8 +233,7 @@ export class PlayerOrchestrator {
         if (this.visualSettings.playbackCard.selectionSequence.value && previousState === PlayerState.Playing) {
             this.selectionManager.clear();
             this.selectionManager.select(frame.identity);
-        }        
-// === BEGIN CHANGE: Update navigateToFrame to use pre-formatted indexText ===
+        }
         const showCaption = this.visualSettings.captionCard.show.value;
         const showDotNumbers = this.visualSettings.navigationCard.dotNumbers.showDotNumbers.value;
         const transitionType = this.visualSettings.transitionCard.transitionType.value.value as string;
@@ -271,7 +262,6 @@ export class PlayerOrchestrator {
                 this.playerState = (previousState === PlayerState.Playing) ? PlayerState.Playing : PlayerState.Paused;
             }
         }
-// === END CHANGE ===
     }
 
     /**

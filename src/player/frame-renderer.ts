@@ -29,7 +29,6 @@ export class FrameRenderer {
     private imageCache: Map<string, HTMLImageElement> = new Map();
     private readonly maxCacheEntries: number = 10;
 
-// === BEGIN CHANGE: Update FrameRenderer constructor to receive index/label span selections ===
     constructor(
         private imageContainer: Selection<HTMLDivElement, any, any, any>,
         private captionContainer: Selection<HTMLDivElement, any, any, any>,
@@ -40,7 +39,6 @@ export class FrameRenderer {
         private errorSvgString: string,
         private onSelect: (identity: ISelectionId) => void,
     ) { }
-// === END CHANGE ===
 
     /**
  * Renders a specific frame.
@@ -54,7 +52,6 @@ export class FrameRenderer {
  * @param showDotNumbers Whether to show the number of frames.
  * @param formattedIndex Format the text index string to be outputted.
  */
-// === BEGIN CHANGE: Add formattedIndex to renderFrame signature ===
     public async renderFrame(
         frame: ImageFrame,
         allFrames: ImageFrame[],
@@ -73,19 +70,16 @@ export class FrameRenderer {
         this.imageContainer.on("click", () => this.onSelect(frame.identity));
         await this.applyD3Transition(frame, transitionDuration, transitionType, isForward);
     }
-// === END CHANGE ===
 
     /**
      * Clears all visual elements from the containers.
      */
-// === BEGIN CHANGE: Clear spans gracefully to not destroy inner node structure ===
     public clearContainers() {
         this.imageContainer.selectAll<HTMLImageElement, any>("img").remove();
         this.captionIndex.text("");
         this.captionLabel.text("");
         this.progressIndicator.selectAll<HTMLButtonElement, any>(".dot").remove();
     }
-// === END CHANGE ===
 
     /**
     * Clears image container.
@@ -113,14 +107,12 @@ export class FrameRenderer {
      * @param showCaption A boolean to determine if the caption should be visible.
      * @param formattedIndex The generated text indicating index string.
      */
-// === BEGIN CHANGE: Update updateCaption to output into the respective spans ===
     private updateCaption(caption: string, showCaption: boolean, formattedIndex: string): void {
         const newCaption = showCaption ? caption : "";
         const newIndex = showCaption ? formattedIndex : "";
         this.captionLabel.text(newCaption);
         this.captionIndex.text(newIndex);
     }
-// === END CHANGE ===
 
     /**
     * Updates progress dots, highlighting the current frame and optionally showing numbers. 
@@ -201,7 +193,6 @@ export class FrameRenderer {
             .selectAll<HTMLImageElement, any>("img.exiting-image")
             .remove();
 
-// === BEGIN CHANGE: Invert horizontal slide transition ===
         // 1. Set up clear, reusable constants
         const axis = type === "slideHorizontal" ? "X" : "Y";
         const isSlide = type === "slideHorizontal" || type === "slideVertical";
@@ -213,7 +204,6 @@ export class FrameRenderer {
             : (isForward ? 100 : -100);
             
         const endValue = -startValue;
-// === END CHANGE ===
 
         // 2. Data binding with original key function (including fallback)
         const images = this.imageContainer

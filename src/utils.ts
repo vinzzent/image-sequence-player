@@ -15,7 +15,6 @@ import DataView = powerbi.DataView;
 
 // #endregion
 
-// === BEGIN CHANGE: Formatter functions for Label and Index ===
 
 /**
  * Formats the label text based on the selected type.
@@ -57,7 +56,6 @@ export function formatIndex(type: string, currentIndex: number, totalFrames: num
             return `${n}`;
     }
 }
-// === END CHANGE ===
 
 // #region handleContextMenu
 
@@ -163,7 +161,6 @@ function _createPlaceholderSvg(message: string, textColor: string): string {
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-// === BEGIN CHANGE: Replace fallback index SVG with transparent fallback ===
 /**
  * Generates a data URI for a completely transparent 1x1 SVG fallback image.
  * @returns A data URI string containing the encoded SVG.
@@ -172,7 +169,6 @@ function _createTransparentFallbackSvg(): string {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1" fill="transparent"/></svg>`;
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
-// === END CHANGE ===
 
 // #endregion
 
@@ -184,10 +180,8 @@ function _createTransparentFallbackSvg(): string {
  * @returns True if the DataView is valid, otherwise false.
  */
 export function isDataViewValid(dataView: DataView): boolean {
-    const categorical = dataView && dataView.categorical;
-    
-    // === BEGIN CHANGE: Category-only fallback mode ===
-    // Removed requirement for categorical.values as it could be undefined if only Category is used
+    const categorical = dataView && dataView.categorical;    
+
     if (!categorical || !categorical.categories) {
         return false;
     }
@@ -197,7 +191,6 @@ export function isDataViewValid(dataView: DataView): boolean {
     if (!sequenceData || !sequenceData.values || sequenceData.values.length === 0) {
         return false;
     }
-    // === END CHANGE ===
     return true;
 }
 
@@ -215,9 +208,7 @@ export function isDataViewValid(dataView: DataView): boolean {
  * @param colorHelper Utility for dynamically generating colors for fallback SVGs.
  * @returns An array of ImageFrame objects built from the DataView.
  */
-// === BEGIN CHANGE: Category-only fallback mode ===
 export function transformDataViewToFrames(dataView: DataView, visualSettings: VisualFormattingSettingsModel, host: IVisualHost, blockExtenalUrls: boolean, onlyHttps: boolean, colorHelper: ColorHelper): ImageFrame[] {
-// === END CHANGE ===
     const categorical = dataView.categorical;
     const categories = categorical?.categories?.find(c => c.source.roles?.["category"]);
     const categoryFormat = categories?.source?.format;
@@ -230,23 +221,19 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
         forCategory: categories ? valueFormatter.create({ format: categoryFormat }) : undefined,
         forValue: valuesData ? valueFormatter.create({ format: valueFormat }) : undefined,
         forTooltips: tooltipFormats.map(f => valueFormatter.create({ format: f }))
-    };
-    
-    // === BEGIN CHANGE: Category-only fallback mode ===
+    };    
+  
     // Removed dependency on `imageData` so it proceeds if at least `categories` are valid
     if (!categories?.values) {
         return [];
     }
-    // === END CHANGE ===
     
     const imageHighlights = imageData?.highlights;
     const isAnyHighlightActive = imageHighlights !== undefined;
     const frames: ImageFrame[] = [];
     const captionsEnabled = visualSettings.captionCard.show.value;
     const captionType = visualSettings.captionCard.type.value.value as string;
-// === BEGIN CHANGE: Retrieve indexType ===
     const indexType = visualSettings.captionCard.indexType.value.value as string;
-// === END CHANGE ===
     for (let i = 0; i < categories.values.length; i++) {
         const identity = host.createSelectionIdBuilder()
             .withCategory(categories, i)
@@ -280,15 +267,12 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
                 const formattedMeasure = formatters.forTooltips[index].format(measureValue);
                 tooltipItems.push({ displayName: measure.source.displayName, value: formattedMeasure });
             }
-        });
-        
-// === BEGIN CHANGE: Use formatLabel ===
+        });        
+
         if (captionsEnabled) {
             captionText = formatLabel(captionType, formattedCategory, formattedValue);
-        }
-// === END CHANGE ===
-        
-        // === BEGIN CHANGE: Set indexText and use transparent fallback SVG ===
+        }        
+
         const indexText = formatIndex(indexType, i, categories.values.length);
         const imageUri: string | null = imageData 
             ? _uriSanitizer(imageData.values[i] as string, blockExtenalUrls, onlyHttps)
@@ -302,7 +286,6 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
             tooltips: tooltipItems,
             dimmed: dimmed
         };
-        // === END CHANGE ===
         frames.push(frame);
     }
     return frames;

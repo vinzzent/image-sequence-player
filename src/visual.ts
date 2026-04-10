@@ -11,7 +11,6 @@ import { ColorHelper } from "powerbi-visuals-utils-colorutils";
 import { VisualFormattingSettingsModel } from "./settings";
 import { ImageFrame } from "./common-interfaces";
 import { PlayerOrchestrator } from "./player/player-orchestrator";
-// === BEGIN CHANGE: Import moveIndex ===
 import {    handleContextMenu,
             buildErrorSvgString,
             isDataViewValid,
@@ -22,7 +21,6 @@ import {    handleContextMenu,
             updateStyling,
             moveIndex
         } from "./utils";
-// === END CHANGE ===
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
@@ -63,13 +61,9 @@ export class Visual implements IVisual {
     private isDataValid: boolean = false;
     private PlayerOrchestrator: PlayerOrchestrator;    
     private tooltipServiceWrapper: ITooltipServiceWrapper;    
-    private errorSvgString: string; 
-    
-    // === BEGIN CHANGE: Category-only fallback mode ===
-    // Updated invalid message since image field is no longer mandatory.
-    private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n field.";
-    // === END CHANGE ===
-    
+    private errorSvgString: string;   
+
+    private static readonly INVALID_MESSAGE: string = "Please add data to \n [Category] \n field.";    
     private static readonly BLOCK_EXTERNAL_URLS: boolean = false;
     private static readonly ONLY_HTTPS: boolean = false;
 
@@ -97,7 +91,6 @@ export class Visual implements IVisual {
             this.host.tooltipService,
             options.element
         );
-// === BEGIN CHANGE: Passing captionIndex and captionLabel to PlayerOrchestrator ===
         this.PlayerOrchestrator = new PlayerOrchestrator({
             allowInteractions: this.allowInteractions,
             selectionManager: this.selectionManager,
@@ -110,7 +103,6 @@ export class Visual implements IVisual {
             captionIndex: this.captionIndex,
             captionLabel: this.captionLabel
         });
-// === END CHANGE ===
 
         // --- Freemium License Verification ---
         // Validate user's available plans. If an Active plan is found, enable Pro mode.
@@ -142,12 +134,8 @@ export class Visual implements IVisual {
         
         this.isDataValid = isDataViewValid(dataView);
 
-        // Get the view model (either real or placeholder)
         if (this.isDataValid) {
-            // === BEGIN CHANGE: Category-only fallback mode ===
-            // Passed colorHelper so the fallback SVG can use theme colors dynamically
             this.imageFrames = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS, Visual.ONLY_HTTPS, this.colorHelper);
-            // === END CHANGE ===
 
             // --- Applying the Freemium Limit ---
             // If the user isn't holding a valid Pro License, mock is off, and frames exceed the Free limit
@@ -169,7 +157,6 @@ export class Visual implements IVisual {
         this.rootElement.classed("is-invalid", !this.isDataValid);
 
         if (this.isDataValid) {
-// === BEGIN CHANGE: Update Caption DOM position calls ===
             moveLabelContainer(
                 this.visualSettings.captionCard.position.value.value as "top" | "bottom", 
                 this.captionContainer, 
@@ -187,7 +174,6 @@ export class Visual implements IVisual {
                 this.progressIndicator,
                 this.contentContainer
             );
-// === END CHANGE ===
             
             updateStyling(this.visualSettings,
                 this.colorHelper,

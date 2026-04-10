@@ -28,7 +28,6 @@ const imageAlignmentOptions: powerbi.IEnumMember[] = [
     { value: "scale-down", displayName: "Center" }
 ];
 
-// === BEGIN CHANGE: Caption Settings Options ===
 const captionTypeOptions: powerbi.IEnumMember[] = [
     { value: "category", displayName: "Category" },
     { value: "value", displayName: "Value" },
@@ -50,7 +49,6 @@ const indexPositionOptions: powerbi.IEnumMember[] = [
     { value: "left", displayName: "Left" },
     { value: "right", displayName: "Right" }
 ];
-// === END CHANGE ===
 
 // --- Define Formatting Cards ---
 
@@ -102,7 +100,6 @@ class TransitionSettingsCard extends FormattingSettingsSimpleCard {
     slices: FormattingSettingsSlice[] = [this.transitionType, this.transitionDuration];
 }
 
-// === BEGIN CHANGE: CaptionSettingsCard Updates ===
 class CaptionSettingsCard extends FormattingSettingsSimpleCard {
     name: string = "caption";
     displayName: string = "Caption Settings";
@@ -166,7 +163,6 @@ class CaptionSettingsCard extends FormattingSettingsSimpleCard {
     topLevelSlice: formattingSettings.ToggleSwitch = this.show;
     slices: FormattingSettingsSlice[] = [this.position, this.type, this.indexType, this.indexPosition, this.color, this.font];
 }
-// === END CHANGE ===
 
 class DotNumbersGroup extends FormattingSettingsSimpleCard {
     name: string = "dotNumbers";

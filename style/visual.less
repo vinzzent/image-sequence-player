@@ -1,0 +1,325 @@
+// Variables
+@controls-height: 40px;
+@progress-height: 22px;
+@indicator-size: 16px;
+@collapsed-controls-height: 12px;
+@icon-size: 16px;
+@dot-size: 16px;
+@active-dot-size: 18px;
+
+// Main container
+.image-sequence-player {
+    background-color: var(--visual-background-color);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Segoe UI', 'wf_segoe-ui_normal', 'Arial', sans-serif;
+
+    // Main content area (Image + Label)
+    .content-container {
+        flex-grow: 1;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 50px;
+        margin-bottom: 20px;
+    }
+
+    // Image container for transitions
+    .image-container {
+        flex-grow: 1;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        /* declare a default alignment */
+        --alignment: contain;
+
+        img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            object-fit: var(--alignment);
+
+            /* REMOVED: The state-based classes (.active, .current, .standby, .next, .hidden, .visible) 
+             were deleted from here because D3 now handles all image styling and transitions directly.
+            */
+        }
+
+        .spinner {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+
+            &.visible {
+                display: block;
+            }
+        }
+    }
+
+    // Caption styling
+    .caption-container {
+        display: block;
+        text-align: center;
+        padding: 5px;
+        box-sizing: border-box;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        // Consume CSS Variables
+        font-family: var(--caption-font-family, 'Segoe UI', sans-serif);
+        font-size: var(--caption-font-size, 12pt);
+        color: var(--caption-color, #333333);
+
+        span:not(:empty) + span:not(:empty) {
+            margin-left: 6px;
+        }
+
+        // Class-based styles
+        &.is-bold {
+            font-weight: bold;
+        }
+
+        &.is-italic {
+            font-style: italic;
+        }
+
+        &.hidden {
+            display: none;
+        }
+
+        &.is-underlined {
+            text-decoration: underline;
+        }
+    }
+
+    // Progress dots
+    .progress-indicator {
+        display: flex;
+        /* Default state is visible */
+        align-items: center;
+        height: @progress-height;
+        gap: 8px;
+        padding: 0 10px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        white-space: nowrap;
+        min-width: 100%;
+
+        &.hidden {
+            display: none;
+        }
+
+        &::-webkit-scrollbar {
+            height: 5px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background-color: var(--scrollbar-color, #605E5C);
+            border-radius: 5px;
+        }
+
+        &::before,
+        &::after {
+            content: '';
+            flex-grow: 1;
+        }
+
+        .dot {
+            border: none;
+            padding: 0;
+            font-family: inherit;
+            flex-shrink: 0;
+            width: @dot-size;
+            height: @dot-size;
+            background-color: var(--dot-color, #605E5C);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: var(--dot-text-color, #FFFFFF);
+
+            &:hover {
+                background-color: var(--hovered-dot-color, #252423);
+            }
+
+            &.active {
+                background-color: var(--active-dot-color, #0078d4);
+                width: @active-dot-size;
+                height: @active-dot-size;
+                font-size: 10px;
+            }
+
+            &.dimmed {
+                opacity: 0.4;
+            }
+        }
+
+    }
+
+    // Controls panel
+    .controls-wrapper {
+        display: block;
+        position: relative;
+        width: 100%;
+        flex-shrink: 0;
+        height: @collapsed-controls-height;
+        transition: height 0.3s ease-in-out;
+
+        .panel-indicator {
+            display: flex;
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            background-color: var(--panel-indicator-color, #FFFFFF);
+            border: 2px solid var(--panel-indicator-border-color, #605E5C);
+            width: @indicator-size + 10px;
+            height: @indicator-size;
+            border-radius: 5px;
+            z-index: 10;
+            transition: bottom 0.3s ease-in-out;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+
+            svg {
+                width: @indicator-size;
+                height: @indicator-size;
+                fill: var(--panel-indicator-border-color, #605E5C);
+                transition: transform 0.3s ease-in-out;
+            }
+
+            &:hover {
+                border: 3px solid var(--hovered-panel-indicator-border-color, #252423);
+
+                svg {
+                    fill: var(--hovered-panel-indicator-border-color, #252423);
+                }
+            }
+        }
+
+        .controls-panel {
+            width: 100%;
+            height: 100%;
+            background-color: rgba(245, 245, 245, 0.9);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+
+            // Control buttons nested inside panel
+            .control-buttons {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: @controls-height;
+                gap: 15px;
+                opacity: 0; // start hidden for fade
+
+                button {
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    padding: 5px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 4px;
+
+                    &:hover {
+                        background-color: rgba(0, 0, 0, 0.1);
+                    }
+
+                    svg {
+                        width: @icon-size;
+                        height: @icon-size;
+                        fill: #333;
+                    }
+
+                    &.loop-toggle.active {
+                        background-color: rgba(0, 0, 0, 0.2);
+                    }
+                }
+            }
+        }
+
+        &.is-expanded {
+            height: @controls-height;
+
+            .controls-panel {
+                opacity: 1;
+                transition-delay: 0.1s;
+
+                .control-buttons {
+                    opacity: 1;
+                    transition: opacity 0.2s ease 0.1s; // fade in with panel
+                }
+            }
+
+            .panel-indicator {
+                bottom: 100%;
+                margin-bottom: 2px;
+
+                svg {
+                    transform: rotate(180deg);
+                }
+            }
+        }
+    }
+
+    // --- High Contrast Mode Styles ---
+    &.highcontrast {
+        .progress-indicator {
+            &::-webkit-scrollbar-thumb {
+                border: 2px solid var(--scrollbar-border-color, #252423);
+            }
+        }
+
+        .progress-indicator .dot {
+            border: 2px solid var(--dot-border-color, #605E5C);
+            box-sizing: border-box;
+
+            &:hover {
+                border-color: var(--hovered-dot-border-color, #605E5C);
+            }
+
+            &.active {
+                border: none;
+            }
+        }
+    }
+
+    // --- STYLES FOR WHEN DATA IS INVALID ---
+    &.is-invalid {
+
+        .progress-indicator,
+        .controls-wrapper {
+            display: none;
+        }
+
+        .caption-container {
+            display: block;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 12pt;
+            font-weight: normal;
+            font-style: normal;
+            color: #333333;
+        }
+    }
+}

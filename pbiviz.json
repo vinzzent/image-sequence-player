@@ -5,14 +5,14 @@
         "guid": "imageSequencePlayerA23B3A115A194CE09E379B7C5697A383",
         "visualClassName": "Visual",
         "version": "1.0.0.0",
-        "description": "Displays image/SVG sequences with play, pause, step, and looping controls inside Power BI.",
-        "supportUrl": "https://github.com/vinzzent/concacore/image-player#support",
+        "description": "The Image Sequence Player is a Power BI visual that plays an ordered sequence of images with playback controls and supports multiple formats, captions, transitions, and interaction with other visuals via cross-filtering and cross-highlighting.",
+        "supportUrl": "https://vinzzent.github.io/concacore/en-us/products/image-sequence-player/#support",
         "gitHubUrl": "https://github.com/vinzzent/image-sequence-player"
     },
     "apiVersion": "5.11.0",
     "author": {
         "name": "Vincent Roland von Borries Conca",
-        "email": "vvborries@gmail.com"
+        "email": "contact.concacore@google.com"
     },
     "assets": {
         "icon": "assets/icon32x32.png"

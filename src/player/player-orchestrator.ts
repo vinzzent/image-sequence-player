@@ -85,8 +85,9 @@ export class PlayerOrchestrator {
      * The main entry point for rendering the visual.
      * @param {ImageFrame[]} imageFrames - The data for all image frames.
      * @param {VisualFormattingSettingsModel} visualSettings - Current format settings.
+     * @param {number} targetIndex - Start the render dynamically at a specific index like a highlighted frame.
      */
-    public async render(imageFrames: ImageFrame[], visualSettings: VisualFormattingSettingsModel): Promise<void> {
+    public async render(imageFrames: ImageFrame[], visualSettings: VisualFormattingSettingsModel, targetIndex: number = 0): Promise<void> {
         this.imageFrames = imageFrames;
         this.visualSettings = visualSettings;
 
@@ -104,7 +105,7 @@ export class PlayerOrchestrator {
         this.spinnerElement.classed("visible", true);
 
         try {
-            await this.navigateToFrame(0, 0); // Render first frame instantly
+            await this.navigateToFrame(targetIndex, 0); // Render target frame instantly
             this.playerState = PlayerState.Paused;
         } catch (error) {
             console.error("Error during initial render:", error);

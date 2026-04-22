@@ -12,3 +12,8 @@ export interface ImageFrame {
     tooltips: VisualTooltipDataItem[] | undefined;
     dimmed: boolean;
 }
+
+export interface TransformResult {
+    frames: ImageFrame[];
+    targetHighlightIndex: number;
+}

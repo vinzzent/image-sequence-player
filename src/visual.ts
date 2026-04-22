@@ -133,9 +133,12 @@ export class Visual implements IVisual {
         this.visualSettings = this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, dataView);
         
         this.isDataValid = isDataViewValid(dataView);
+        let targetIndex = 0;
 
         if (this.isDataValid) {
-            this.imageFrames = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS, Visual.ONLY_HTTPS, this.colorHelper);
+            const transformResult = transformDataViewToFrames(dataView, this.visualSettings, this.host, Visual.BLOCK_EXTERNAL_URLS, Visual.ONLY_HTTPS, this.colorHelper);
+            this.imageFrames = transformResult.frames;
+            targetIndex = transformResult.targetHighlightIndex;
 
             // --- Applying the Freemium Limit ---
             // If the user isn't holding a valid Pro License, mock is off, and frames exceed the Free limit
@@ -143,6 +146,11 @@ export class Visual implements IVisual {
                 // Keep only the first 15 images
                 this.imageFrames = this.imageFrames.slice(0, Visual.FREE_VERSION_MAX_FRAMES);
                 
+                // Adjust target index gracefully if out of new bounds
+                if (targetIndex >= this.imageFrames.length) {
+                    targetIndex = 0;
+                }
+
                 // Display the native UI warning message block
                 this.host.displayWarningIcon(
                     "Free Version Limit", 
@@ -185,7 +193,7 @@ export class Visual implements IVisual {
             );
         }
 
-        await this.PlayerOrchestrator.render(this.imageFrames, this.visualSettings);
+        await this.PlayerOrchestrator.render(this.imageFrames, this.visualSettings, targetIndex);
         this.events.renderingFinished(options);
     }
 

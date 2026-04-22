@@ -6,7 +6,7 @@ import { Selection as d3Selection } from "d3";
 import { select as d3Select } from "d3-selection";
 import { ColorHelper } from "powerbi-visuals-utils-colorutils";
 import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
-import { ImageFrame } from "./common-interfaces";
+import { ImageFrame, TransformResult } from "./common-interfaces";
 import { VisualFormattingSettingsModel } from "./settings";
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
@@ -208,7 +208,7 @@ export function isDataViewValid(dataView: DataView): boolean {
  * @param colorHelper Utility for dynamically generating colors for fallback SVGs.
  * @returns An array of ImageFrame objects built from the DataView.
  */
-export function transformDataViewToFrames(dataView: DataView, visualSettings: VisualFormattingSettingsModel, host: IVisualHost, blockExtenalUrls: boolean, onlyHttps: boolean, colorHelper: ColorHelper): ImageFrame[] {
+export function transformDataViewToFrames(dataView: DataView, visualSettings: VisualFormattingSettingsModel, host: IVisualHost, blockExtenalUrls: boolean, onlyHttps: boolean, colorHelper: ColorHelper): TransformResult {
     const categorical = dataView.categorical;
     const categories = categorical?.categories?.find(c => c.source.roles?.["category"]);
     const categoryFormat = categories?.source?.format;
@@ -225,11 +225,20 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
   
     // Removed dependency on `imageData` so it proceeds if at least `categories` are valid
     if (!categories?.values) {
-        return [];
+        return { frames: [], targetHighlightIndex: 0 };
     }
     
-    const imageHighlights = imageData?.highlights;
+    const imageHighlights = imageData?.highlights || categorical?.values?.find(v => v.highlights)?.highlights;
     const isAnyHighlightActive = imageHighlights !== undefined;
+
+    let targetHighlightIndex = 0;
+    if (isAnyHighlightActive && imageHighlights) {
+        const foundIndex = imageHighlights.findIndex(h => h !== null && h !== "");
+        if (foundIndex !== -1) {
+            targetHighlightIndex = foundIndex;
+        }
+    }
+
     const frames: ImageFrame[] = [];
     const captionsEnabled = visualSettings.captionCard.show.value;
     const captionType = visualSettings.captionCard.type.value.value as string;
@@ -288,7 +297,7 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
         };
         frames.push(frame);
     }
-    return frames;
+    return { frames, targetHighlightIndex };
 }
 
 /**

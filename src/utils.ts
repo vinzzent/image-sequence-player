@@ -247,13 +247,7 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
         const identity = host.createSelectionIdBuilder()
             .withCategory(categories, i)
             .createSelectionId();
-        let dimmed = false; // default: not dimmed (fully visible)
-        if (isAnyHighlightActive) {
-            const highlightVal = imageHighlights ? imageHighlights[i] : null;
-            if (highlightVal === null || highlightVal === "") {
-                dimmed = true; // dimmed when not highlighted
-            }
-        }
+
         let captionText = '';
         const tooltipItems: VisualTooltipDataItem[] = [];
         const categoryRaw = categories.values[i];
@@ -293,7 +287,7 @@ export function transformDataViewToFrames(dataView: DataView, visualSettings: Vi
             caption: captionText,
             indexText: indexText,
             tooltips: tooltipItems,
-            dimmed: dimmed
+            dimmed: false
         };
         frames.push(frame);
     }

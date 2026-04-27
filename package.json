@@ -11,6 +11,7 @@
     "pbiviz": "pbiviz",
     "start": "pbiviz start",
     "package": "pbiviz package",
+    "package_verbose": "pbiviz package --verbose",
     "lint": "eslint ."
   },
   "dependencies": {
